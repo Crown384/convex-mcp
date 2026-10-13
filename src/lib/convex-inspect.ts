@@ -13,7 +13,20 @@ const validName = (name: unknown): name is string =>
   typeof name === "string" && /^[A-Za-z_][\w./:-]{0,199}$/.test(name);
 
 function admin(url: URL, key: string): ConvexHttpClient {
-  const client = new ConvexHttpClient(url.origin, { logger: false, fetch: globalThis.fetch });
+  // Pin SDK traffic to the exact known read-only query route. Fetch a bounded
+  // response, with timeout and redirects disabled, before the SDK can parse it.
+  const readOnlyFetch: typeof globalThis.fetch = async (resource, init) => {
+    const target = resource instanceof URL ? resource.href
+      : typeof resource === "string" ? resource : resource.url;
+    if (target !== url.origin + "/api/query" || init?.method !== "POST")
+      throw new SafeError("CAPABILITY_UNAVAILABLE");
+    const response = await globalThis.fetch(resource, {
+      ...init, redirect: "error", cache: "no-store", signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new SafeError("CAPABILITY_UNAVAILABLE");
+    return Response.json(await boundedJson(response, 256_000));
+  };
+  const client = new ConvexHttpClient(url.origin, { logger: false, fetch: readOnlyFetch });
   // This internal API is used by Convex CLI; its runtime method predates public typings.
   (client as unknown as { setAdminAuth(value: string): void }).setAdminAuth(key);
   return client;
