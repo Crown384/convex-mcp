@@ -12,6 +12,7 @@ export function authOptions(deliver = sendSignInCode) {
   return {
     appName: "Pama Convex MCP", baseURL: origin, basePath: "/api/auth", secret,
     trustedOrigins: [origin],
+    user: { additionalFields: { userId: { type: "string", required: false, input: false } } },
     logger: { disabled: true },
     emailAndPassword: { enabled: false },
     session: { expiresIn: 6 * 60 * 60, updateAge: 60 * 60, cookieCache: { enabled: false } },

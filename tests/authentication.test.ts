@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { betterAuth } from "better-auth/minimal";
 import { memoryAdapter } from "better-auth/adapters/memory";
+import { getAuthTables } from "better-auth/db";
 import { authOptions } from "../src/lib/auth/options";
 import { authorizeMcp } from "../src/lib/auth/authorize";
 import { sendSignInCode } from "../src/lib/auth/mailjet";
@@ -31,7 +32,7 @@ beforeEach(() => {
   process.env.BETTER_AUTH_SECRET="s".repeat(48);
   process.env.AUTH_ALLOWED_EMAILS="owner@example.com";
   delivered="";
-  const db: Record<string, object[]> = {};
+  const db: Record<string, object[]> = Object.fromEntries(Object.keys(getAuthTables(authOptions())).map(key=>[key,[]]));
   auth = betterAuth({ ...authOptions(async (_email, otp) => { delivered=otp; }),
     database: memoryAdapter(db),
   });
