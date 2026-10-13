@@ -51,7 +51,20 @@ export async function proxyAuth(request:Request, path:string) {
     for(const key of ["content-type","location"]) {const value=response.headers.get(key);if(value)output.set(key,value);}
     for(const value of response.headers.getSetCookie()) output.append("set-cookie",value);
     if(response.status>=500) return Response.json({error:"AUTH_UNAVAILABLE"},{status:503,headers:noStoreHeaders});
-    return new Response(await boundedBody(new Request("https://response.invalid",{method:"POST",body:response.body,duplex:"half"} as RequestInit),131072),{status:response.status,headers:output});
+    const source=await boundedBody(new Request("https://response.invalid",{method:"POST",body:response.body,duplex:"half"} as RequestInit),131072);
+    // Server fetch identifies itself as cors. Restore browser navigation only after the
+    // trusted authorization server has validated the OAuth request and returned its redirect.
+    const navigation=request.headers.get("sec-fetch-mode")==="navigate" || request.headers.get("accept")?.includes("text/html");
+    if(request.method==="GET" && path==="oauth2/authorize" && navigation && response.status===200 && output.get("content-type")?.includes("application/json")) {
+      const result=JSON.parse(source) as {redirect?:unknown;url?:unknown};
+      if(result.redirect===true && typeof result.url==="string") {
+        const target=new URL(result.url,siteOrigin());
+        if(target.username || target.password || (target.origin!==siteOrigin() && target.protocol!=="https:"))throw new AuthFailure();
+        output.set("location",target.href);
+        return new Response(null,{status:303,headers:output});
+      }
+    }
+    return new Response([204,304].includes(response.status)?null:source,{status:response.status,headers:output});
   } catch { return Response.json({error:"AUTH_UNAVAILABLE"},{status:503,headers:noStoreHeaders}); }
 }
 export async function ownerSession(request:Request) {

@@ -50,7 +50,7 @@ export function authOptions(deliver = sendSignInCode, schemaConfig?: {origin:str
         loginPage: "/sign-in", consentPage: "/consent",
         scopes: [MCP_SCOPE, "offline_access"], validAudiences: [origin + "/api/mcp"],
         grantTypes: ["authorization_code", "refresh_token"],
-        accessTokenExpiresIn: 300, refreshTokenExpiresIn: 7 * 24 * 60 * 60, codeExpiresIn: 60,
+        accessTokenExpiresIn: 300, refreshTokenExpiresIn: 7 * 24 * 60 * 60, codeExpiresIn: 600,
         allowDynamicClientRegistration: true, allowUnauthenticatedClientRegistration: true,
         clientRegistrationDefaultScopes: [MCP_SCOPE],
         clientRegistrationAllowedScopes: [MCP_SCOPE, "offline_access"],
