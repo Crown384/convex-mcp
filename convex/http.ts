@@ -3,6 +3,7 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { createAuth } from "./auth";
 import { AUTH_ENDPOINTS, ownerEmail } from "../src/lib/auth/settings";
+import { sendSignInCode } from "../src/lib/auth/mailjet";
 import { authorizeMcp } from "../src/lib/auth/authorize";
 import { noStoreHeaders } from "../src/lib/http-headers";
 
@@ -58,12 +59,23 @@ const authHandler = httpAction(async (ctx, request) => {
         return Response.json({ error: "RATE_LIMITED" }, { status: 429, headers: { ...noStoreHeaders, "Retry-After": "60" } });
       }
     }
-    const auth = createAuth(ctx);
+    let deliveryFailed = false;
+    const auth = createAuth(ctx, async (recipient, code) => {
+      try { await sendSignInCode(recipient, code); }
+      catch (error) { deliveryFailed = true; throw error; }
+    });
     if (kind === "send") {
       const context = await auth.$context;
       await context.adapter.deleteMany({ model: "verification", where: [{ field: "identifier", value: "sign-in-otp-" + email }] });
     }
     const response = await auth.handler(request);
+    // Better Auth awaits email delivery but deliberately swallows callback errors.
+    // Surface provider failure safely and invalidate the undelivered challenge.
+    if (kind === "send" && deliveryFailed) {
+      const context = await auth.$context;
+      await context.adapter.deleteMany({ model: "verification", where: [{ field: "identifier", value: "sign-in-otp-" + email }] });
+      return Response.json({ error: "MAIL_DELIVERY_FAILED" }, { status: 503, headers: noStoreHeaders });
+    }
     resetAttempts = kind === "send" && response.ok;
     const headers = new Headers(response.headers);
     for (const [key, value] of Object.entries(noStoreHeaders)) headers.set(key, value);
