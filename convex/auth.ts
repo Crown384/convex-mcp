@@ -4,7 +4,7 @@ import type { DataModel } from "./_generated/dataModel";
 import { components } from "./_generated/api";
 import schema from "./betterAuth/schema";
 import { authOptions } from "../src/lib/auth/options";
-export const authComponent=createClient<DataModel>(components.betterAuth,{local:{schema}});
+export const authComponent=createClient<DataModel,typeof schema>(components.betterAuth,{local:{schema}});
 export function createAuthOptions(ctx:GenericCtx<DataModel>) {
   return { ...authOptions(), database:authComponent.adapter(ctx) };
 }

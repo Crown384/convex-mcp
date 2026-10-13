@@ -2,12 +2,12 @@ import type { BetterAuthOptions } from "better-auth/minimal";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { emailOTP, jwt } from "better-auth/plugins";
 import { oauthProvider } from "@better-auth/oauth-provider";
-import { authIssuer, mcpResource, MCP_SCOPE, ownerEmail, siteOrigin } from "./settings";
+import { MCP_SCOPE, ownerEmail, siteOrigin } from "./settings";
 import { sendSignInCode } from "./mailjet";
 
-export function authOptions(deliver = sendSignInCode) {
-  const origin = siteOrigin();
-  const secret = process.env.BETTER_AUTH_SECRET;
+export function authOptions(deliver = sendSignInCode, schemaConfig?: {origin:string;secret:string}) {
+  const origin = schemaConfig?.origin ?? siteOrigin();
+  const secret = schemaConfig?.secret ?? process.env.BETTER_AUTH_SECRET;
   if (!secret || secret.length < 32) throw new Error("AUTH_NOT_CONFIGURED");
   return {
     appName: "Pama Convex MCP", baseURL: origin, basePath: "/api/auth", secret,
@@ -43,17 +43,18 @@ export function authOptions(deliver = sendSignInCode) {
           try { await deliver(email, otp); } catch { throw new APIError("BAD_GATEWAY", { message: "Unable to send your code" }); }
         },
       }),
-      jwt({ jwt: { issuer: authIssuer(), audience: mcpResource(), expirationTime: "5m" },
+      jwt({ jwt: { issuer: origin + "/api/auth", audience: origin + "/api/mcp", expirationTime: "5m" },
         jwks: { keyPairConfig: { alg: "RS256" } },
       }),
       oauthProvider({
         loginPage: "/sign-in", consentPage: "/consent",
-        scopes: [MCP_SCOPE, "offline_access"], validAudiences: [mcpResource()],
+        scopes: [MCP_SCOPE, "offline_access"], validAudiences: [origin + "/api/mcp"],
         grantTypes: ["authorization_code", "refresh_token"],
         accessTokenExpiresIn: 300, refreshTokenExpiresIn: 7 * 24 * 60 * 60, codeExpiresIn: 60,
         allowDynamicClientRegistration: true, allowUnauthenticatedClientRegistration: true,
         clientRegistrationDefaultScopes: [MCP_SCOPE],
         clientRegistrationAllowedScopes: [MCP_SCOPE, "offline_access"],
+        silenceWarnings: {oauthAuthServerConfig:true},
         clientPrivileges: async ({user}) => Boolean(user && ownerEmail(user.email)),
       }),
     ],

@@ -110,7 +110,7 @@ async function oauthAccess() {
   const pending=await call("/oauth2/authorize?"+query,undefined,cookies);
   const location=pending.headers.get("location");
   expect(location).toContain("/consent");
-  const signedQuery=new URL(location!).searchParams.toString();
+  const signedQuery=new URL(location!,origin).searchParams.toString();
   const consent=await call("/oauth2/consent",{accept:true,oauth_query:signedQuery},cookies);
   expect(consent.status).toBe(200);
   const redirect=await consent.json();

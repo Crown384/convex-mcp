@@ -1,4 +1,4 @@
-import type { Auth, BetterAuthOptions } from "better-auth/minimal";
+import type { Auth, BetterAuthOptions } from "better-auth";
 import { AuthFailure, authIssuer, mcpResource, MCP_SCOPE, ownerEmail } from "./settings";
 
 // Full backend validation on every call. No cached session or old personal-token fallback.
