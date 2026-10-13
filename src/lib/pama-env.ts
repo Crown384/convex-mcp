@@ -40,7 +40,7 @@ function machineToken(): string {
 }
 
 /** Limits upstream body size even if content-length is missing or forged. */
-async function boundedJson(response: Response): Promise<unknown> {
+export async function boundedJson(response: Response, maxBytes = 64_000): Promise<unknown> {
   const reader = response.body?.getReader();
   if (!reader) throw new SafeError("UPSTREAM_FAILURE");
   const chunks: Uint8Array[] = [];
