@@ -112,3 +112,12 @@ test("malformed page and oversized projected values fail closed",async()=>{
  setup(()=>json({status:"success",value:{page:[{}],isDone:"yes",continueCursor:"end"}}));
  await assert.rejects(inspect.listDocuments("sample","staging","orders",{limit:1}),{code:"CAPABILITY_UNAVAILABLE"});
 });
+
+test("document projection rejects nested objects instead of leaking nested personal data",async()=>{
+ process.env.MCP_DOCUMENT_READ_POLICY=JSON.stringify({sample:{orders:["metadata"]}});
+ setup(()=>json({status:"success",value:{
+  page:[{metadata:{publicName:"allowed?",privateEmail:"MUST_NOT_LEAK"}}],
+  isDone:true,continueCursor:"done",
+ }}));
+ await assert.rejects(inspect.listDocuments("sample","staging","orders"),{code:"DOCUMENT_FIELD_TYPE_UNSUPPORTED"});
+});
