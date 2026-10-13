@@ -2,7 +2,7 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { createAuth } from "./auth";
 import { authorizeMcp } from "../src/lib/auth/authorize";
-import { noStoreHeaders } from "../src/lib/secure-access";
+import { noStoreHeaders } from "../src/lib/http-headers";
 
 const http=httpRouter();
 const authHandler=httpAction(async (ctx,request) => {
