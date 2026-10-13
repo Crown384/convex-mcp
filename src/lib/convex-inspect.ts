@@ -156,8 +156,16 @@ export async function listDocuments(
         const record = raw as Record<string,unknown>;
         const safe:Record<string,unknown>={};
         for (const field of fields) {
-          if (Object.prototype.hasOwnProperty.call(record,field))
-            safe[field]=record[field];
+          if (!Object.prototype.hasOwnProperty.call(record,field)) continue;
+          // Nested objects/arrays may contain unexpected personal fields;
+          // require future nested-field policies before exposing any of them.
+          const value = record[field];
+          if (value!==null && typeof value!=="string" &&
+              typeof value!=="number" && typeof value!=="boolean")
+            throw new SafeError("DOCUMENT_FIELD_TYPE_UNSUPPORTED");
+          if (typeof value==="number" && !Number.isFinite(value))
+            throw new SafeError("DOCUMENT_FIELD_TYPE_UNSUPPORTED");
+          safe[field]=value;
         }
         return safe;
       });
