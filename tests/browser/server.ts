@@ -5,7 +5,7 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import { getAuthTables } from "better-auth/db";
 import { authOptions } from "../../src/lib/auth/options";
 import { authorizeMcp } from "../../src/lib/auth/authorize";
-process.env.NODE_ENV="development";
+process.env={...process.env,NODE_ENV:"development"};
 process.env.AUTH_SITE_URL="http://127.0.0.1:3199";
 process.env.CONVEX_AUTH_SITE_URL="http://127.0.0.1:3198";
 process.env.AUTH_ALLOWED_EMAILS="owner@example.com";
@@ -31,7 +31,7 @@ const backend=createServer(async(req,res)=>{
   }catch{res.statusCode=401;res.end('{"error":"UNAUTHORIZED"}');}
 });
 backend.listen(3198,"127.0.0.1");
-const web=spawn("pnpm",["exec","next","dev","--hostname","127.0.0.1","--port","3199"],{stdio:"inherit",env:process.env});
+const web=spawn("corepack",["pnpm","exec","next","dev","--hostname","127.0.0.1","--port","3199"],{stdio:"inherit",env:process.env});
 function stop(){web.kill("SIGTERM");backend.close();process.exit(0);}
 process.on("SIGINT",stop);process.on("SIGTERM",stop);
 web.on("exit",code=>{backend.close();process.exit(code??1);});
