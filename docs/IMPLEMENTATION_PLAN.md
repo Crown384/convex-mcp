@@ -37,11 +37,11 @@
 - Preview/execution split, one-use/short-lived server approval, race/replay defense, allowlists and emergency disable switch.
 - Harmless development test operation first; prod stays read-only.
 
-## Phase 4 — Pamastore seller pilot
+## Phase 4 — generic approved-function pilot
 
-- Inspect Pamastore business rules; implement app-owned bridge where necessary in a separate reviewed PR.
-- Pending applicants / details / verification eligibility / approval / post-action confirmation.
-- Production enablement requires another explicit owner approval.
+- Exercise a safe registered application-owned function in a disposable Convex development deployment using the universal MCP execution contract.
+- Validate permissions, preview/approval, exact arguments, one-use token, replay rejection, audit trail, safe output and post-action confirmation.
+- Production enablement requires a separate owner approval; do not add named-project business logic to the MCP core.
 
 ## Phase 5 — security & release
 
@@ -50,4 +50,4 @@
 
 ### Explicitly unresolved
 
-Identity provider, OAuth issuer, future production hostname, Convex API permission feasibility, and Pamastore's existing approved seller action remain open. None block Phase 0. Do not assert these integrations exist.
+Identity provider, OAuth issuer, future production hostname, Convex API permission feasibility, and a generic disposable function-execution acceptance fixture remain open. No named app pilot blocks the core MCP release. Do not assert unverified integrations exist.

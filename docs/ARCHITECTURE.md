@@ -25,7 +25,7 @@ Phone owner (browser session)         ChatGPT (OAuth access token)
 - **Phase 1**: authenticated owner/workspace records, project/deployment registry, app-layer encrypted scoped keys, authorization policies, append-only audit. No broad public functions or premature tool exposure.
 - **Phase 2**: supported SDK/Streamable HTTP remote MCP transport; audited read-only tools, verified scopes and OAuth resource discovery, bounded paginated outputs.
 - **Phase 3**: exact preview + short-lived server-issued single-use approvals, idempotency, emergency stop, auditable action allowlists. No generic arbitrary JavaScript or production patch API.
-- **Phase 4**: Pamastore-specific business adapter from reviewed repository code; admin bridge executes application business rules, **not** a direct DB flag edit.
+- **Phase 4**: generic approved-function execution with a disposable development application proving app-owned business rules, **not** a direct database flag edit. Application-specific examples are not core deliverables.
 - **Phase 5**: real-client checks, threat model, recovery/rotation, end-to-end QA and owner-approved release.
 
 ## Deployment boundaries
