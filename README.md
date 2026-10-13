@@ -1,40 +1,42 @@
-# Welcome to your Convex + Next.js app
+# Pama Convex MCP
 
-This is a [Convex](https://convex.dev/) project created with [`npm create convex`](https://www.npmjs.com/package/create-convex).
+A **planned security-first, remotely connectable Convex control plane** with a phone-friendly Next.js dashboard, a separate Convex metadata database, and (in a future phase) a scoped OAuth-authenticated MCP server.
 
-After the initial setup (<2 minutes) you'll have a working full-stack app using:
+**Current status: Phase 0 foundation.** The landing page is informational. There is no login, project connection, credential vault, management tool, production operation, or MCP endpoint yet. Do not treat a healthy Next.js page or `/api/health` as proof that other Convex deployments are connected.
 
-- Convex as your backend (database, server logic)
-- [React](https://react.dev/) as your frontend (web page interactivity)
-- [Next.js](https://nextjs.org/) for optimized web hosting and page routing
-- [Tailwind](https://tailwindcss.com/) for building great looking accessible UI
+Read [PROJECT_SPEC.md](./PROJECT_SPEC.md) for the full product and acceptance criteria; read [AGENTS.md](./AGENTS.md) before contributing.
 
-## Get started
+## Running the foundation
 
-If you just cloned this codebase and didn't use `npm create convex`, run:
+Requires Node.js 20.9+ and pnpm 10 (pin in `package.json`). Use Corepack where available.
 
-```
-npm install
-npm run dev
+```sh
+corepack enable
+pnpm install --frozen-lockfile
+pnpm dev:frontend
 ```
 
-If you're reading this README on GitHub and want to use this template, run:
+Open http://localhost:3000. Phase 0's frontend intentionally works **without deploy keys or a Convex connection**.
 
+```sh
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
 ```
-npm create convex@latest -- -t nextjs
-```
 
-## Learn more
+`pnpm dev:backend` is **not** needed for this phase; it starts Convex's development workflow and can update a developer's own deployment. Only use it with an explicitly separate development Convex project after Phase 1 setup. Never run `convex deploy` against a production deployment as part of review.
 
-To learn more about developing your project with Convex, check out:
+## Security and release boundaries
 
-- The [Tour of Convex](https://docs.convex.dev/get-started) for a thorough introduction to Convex principles.
-- The rest of [Convex docs](https://docs.convex.dev/) to learn about all Convex features.
-- [Stack](https://stack.convex.dev/) for in-depth articles on advanced topics.
+- Feature work: `feat/*` → PR → `staging`; owner-reviewed release → `main`.
+- Only commits to `main` are eligible for Vercel's automatic builds; feature and staging builds are skipped. See [the release guard](./scripts/vercel-ignore-build.cjs).
+- `pnpm build` **never executes `convex deploy`**. A future production control-plane backend release needs its own explicit authorization and procedure.
+- No project secrets are present in this repository. **Never put managed deploy keys in `NEXT_PUBLIC_*`**, commit env files, or email tokens.
+- This repository must not mutate managed production projects before Phases 1–4 introduce verified authorization and approvals.
 
-## Join the community
+See [architecture](./docs/ARCHITECTURE.md), [environment setup](./docs/ENVIRONMENT.md), and [PR-sized roadmap](./docs/IMPLEMENTATION_PLAN.md).
 
-Join thousands of developers building full-stack apps with Convex:
+## Phase 0 verification
 
-- Join the [Convex Discord community](https://convex.dev/community) to get help in real-time.
-- Follow [Convex on GitHub](https://github.com/get-convex/), star and contribute to the open-source implementation of Convex.
+Run `pnpm check` plus `pnpm build` in a clean, disposable environment. CI is intentionally not automatically enabled, to conserve GitHub Actions credits. Build/type/test evidence should be attached to the PR. See the validation and remaining manual checks in the PR description.
