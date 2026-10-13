@@ -2,7 +2,7 @@
 
 Authentication has moved to Better Auth email codes and OAuth; see [AUTHENTICATION.md](AUTHENTICATION.md).
 
-This milestone uses the PamaENV machine API as the project registry and secret vault. It introduces no additional persistent secret store or backend deployment. A registered PamaENV project must contain variables named CONVEX_URL and CONVEX_DEPLOY_KEY for the appropriate staging or production scope. Shared variables are included by PamaENV's existing machine lookup resolution. The MCP service requests exactly those two keys for a project/environment and never returns either.
+This milestone uses the PamaENV machine API as the project registry and secret vault. It introduces no additional managed-project secret store. The authentication milestone now requires its own Convex control-plane backend. A registered PamaENV project must contain variables named CONVEX_URL and CONVEX_DEPLOY_KEY for the appropriate staging or production scope. Shared variables are included by PamaENV's existing machine lookup resolution. The MCP service requests exactly those two keys for a project/environment and never returns either.
 
 ## Server setup
 
@@ -14,7 +14,7 @@ By default production connection checks are denied. Set MCP_ENABLE_PRODUCTION_RE
 
 ## Dashboard
 
-Open /dashboard, enter the MCP_ACCESS_TOKEN. The token is kept only in the tab's React state (not localStorage or cookies) and transmitted to the same-origin /api/owner endpoint over HTTPS. Clear via Disconnect or close tab. Browser traffic includes this control-plane token, NOT Convex deploy keys/PamaENV machine token. Use a private trusted device.
+Sign in at /sign-in with your email code, then open /dashboard. Authentication uses an HTTP-only Better Auth session cookie. Sign out to end the session, or revoke a client connection. Deploy keys and the PamaENV machine token remain server-only.
 
 ## Remote MCP
 
@@ -22,9 +22,7 @@ Endpoint: https://YOUR_HOST/api/mcp. Authenticate through Better Auth OAuth with
 
 Available tools: projects_list, deployments_list, deployment_status, environment_names_list, tables_list, functions_list, usage_limits_list, documents_list, logs_recent. Metadata tools return only bounded metadata. The separate optional `documents_list` tool reads strictly allowlisted staging document scalar values; none of these tools exposes environment secret values or invokes application mutations. No arbitrary queries, run, deletes, mutations, environment values or unmanaged hosts.
 
-Example initialization:
-
-    curl -X POST https://YOUR_HOST/api/mcp -H "Authorization: Bearer (MCP_ACCESS_TOKEN)" -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"smoke","version":"1.0"}}}'
+Use your MCP client's OAuth flow to initialize and discover tools; do not paste a session token or deployment credential into a command or chat.
 
 Deployment status requires PamaENV access plus a documented Convex Deployment API endpoint /api/v1/deployment_info. Environment names uses /api/v1/list_environment_variables and strips values before returning. Both calls are read-only; production env name reads are always blocked.
 
