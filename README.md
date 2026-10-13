@@ -25,7 +25,7 @@ Set these **server-only** variables before connecting real projects:
 
 See [`.env.example`](./.env.example) and the [step-by-step integration guide](./docs/READ_ONLY_MVP.md). Keep tokens and deploy keys out of Git, chat prompts, URLs, and `NEXT_PUBLIC_*` variables. PamaENV must hold `CONVEX_URL` and `CONVEX_DEPLOY_KEY` for each delegated deployment environment. The server looks up those values on each operation; revoking its machine client blocks subsequent lookups. **Do not enter Convex deploy keys into the dashboard.**
 
-Visit `/dashboard` for owner project discovery and status checks. The remote tool endpoint is `POST /api/mcp`, with `Authorization: Bearer <MCP_ACCESS_TOKEN>` and `Content-Type: application/json`. This is a **stateless JSON-RPC subset of Streamable HTTP**, not a full OAuth-based MCP implementation; clients requiring OAuth discovery are not yet supported. Available tools are `projects_list`, `deployments_list`, `deployment_status`, and staging-only `environment_names_list` (names, never secret values).
+Visit `/dashboard` for owner project discovery and status checks. The remote tool endpoint is `POST /api/mcp`, with `Authorization: Bearer <MCP_ACCESS_TOKEN>` and `Content-Type: application/json`. This is a **stateless JSON-RPC subset of Streamable HTTP**, not a full OAuth-based MCP implementation; clients requiring OAuth discovery are not yet supported. Available tools include `projects_list`, `deployments_list`, `deployment_status`, staging-only `environment_names_list`, `tables_list`, `functions_list`, and `usage_limits_list`. New tools expose bounded metadata only; no app functions are executed.
 
 ## Validation
 

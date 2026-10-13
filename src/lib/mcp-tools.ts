@@ -1,4 +1,5 @@
 import { getDeploymentStatus, getEnvironmentNames, listProjects, SafeError, validEnvironment, validSlug } from "./pama-env";
+import { listTables, listFunctions, listUsageLimits } from "./convex-inspect";
 
 export const toolDefinitions = [
   {
@@ -15,6 +16,24 @@ export const toolDefinitions = [
     name: "deployment_status",
     description: "Read-only connection test against the deployment's Convex admin API. Production must be explicitly enabled by the server owner.",
     inputSchema: { type: "object", properties: { project: { type: "string" }, environment: { type: "string", enum: ["staging", "production"] } }, required: ["project", "environment"], additionalProperties: false },
+  },
+  {
+    name: "tables_list",
+    description: "List Convex table names and declared-schema presence (no data or PII).",
+    inputSchema: { type: "object", properties: { project: { type: "string" }, environment: { type: "string", enum: ["staging", "production"] } }, required: ["project", "environment"], additionalProperties: false },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: "functions_list",
+    description: "Read bounded metadata for deployed functions. Does not execute functions.",
+    inputSchema: { type: "object", properties: { project: { type: "string" }, environment: { type: "string", enum: ["staging", "production"] } }, required: ["project", "environment"], additionalProperties: false },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: "usage_limits_list",
+    description: "Read existing usage-limit settings; never changes them.",
+    inputSchema: { type: "object", properties: { project: { type: "string" }, environment: { type: "string", enum: ["staging", "production"] } }, required: ["project", "environment"], additionalProperties: false },
+    annotations: { readOnlyHint: true },
   },
   {
     name: "environment_names_list",
@@ -50,6 +69,15 @@ export async function runTool(name: unknown, argumentsInput: unknown): Promise<u
       if (!validSlug(args.project) || !validEnvironment(args.environment)) throw new SafeError("INVALID_ARGUMENTS");
       return getDeploymentStatus(args.project, args.environment);
     }
+    case "tables_list":
+    case "functions_list":
+    case "usage_limits_list": {
+      const args = exactArguments(argumentsInput, ["project", "environment"]);
+      if (!validSlug(args.project) || !validEnvironment(args.environment)) throw new SafeError("INVALID_ARGUMENTS");
+      if (name === "tables_list") return listTables(args.project,args.environment);
+      if (name === "functions_list") return listFunctions(args.project,args.environment);
+      return listUsageLimits(args.project,args.environment);
+    }
     case "environment_names_list": {
       const args = exactArguments(argumentsInput, ["project", "environment"]);
       if (!validSlug(args.project) || !validEnvironment(args.environment)) throw new SafeError("INVALID_ARGUMENTS");
@@ -70,7 +98,9 @@ export async function dispatchMcp(input: unknown): Promise<{ status: number; bod
   if (request.id === undefined) return { status: 202 };
   const id = request.id;
   if (request.method === "initialize") return { status: 200, body: { jsonrpc: "2.0", id, result: {
-    protocolVersion: "2025-06-18", capabilities: { tools: { listChanged: false } },
+    protocolVersion: request.params && typeof request.params === "object" && !Array.isArray(request.params) &&
+      "protocolVersion" in request.params && request.params.protocolVersion === "2025-11-25"
+      ? "2025-11-25" : "2025-06-18", capabilities: { tools: { listChanged: false } },
     serverInfo: { name: "pama-convex-mcp", version: "0.2.0" },
     instructions: "Choose an explicit project and environment. All tools are read-only. Production is disabled unless the owner enables it.",
   } } };
