@@ -132,7 +132,7 @@ test("MCP dispatch implements initialization, list, error hygiene, and notificat
   const init = await mcp.dispatchMcp({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
   assert.equal(init.body.result.protocolVersion, "2025-06-18");
   const list = await mcp.dispatchMcp({ jsonrpc: "2.0", id: 2, method: "tools/list" });
-  assert.equal(list.body.result.tools.length, 7);
+  assert.equal(list.body.result.tools.length, 8);
   const denied = await mcp.dispatchMcp({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "unknown", arguments: {} } });
   assert.equal(denied.body.result.isError, true);
   assert.equal(denied.body.result.content[0].text, '{"error":"UNKNOWN_TOOL"}');

@@ -63,3 +63,61 @@ test("function metadata excludes arbitrary upstream fields and never executes fu
  ]);
  assert.equal(JSON.stringify(output).includes("SENSITIVE"),false);
 });
+
+test("documents reject unauthorized projects/tables and disabled policy before fetching secrets",async()=>{
+ let calls=0;
+ global.fetch=async()=>{calls++;throw Error("should not fetch")};
+ delete process.env.MCP_DOCUMENT_READ_POLICY;
+ await assert.rejects(inspect.listDocuments("sample","staging","orders"),{code:"DOCUMENT_ACCESS_DISABLED"});
+ process.env.MCP_DOCUMENT_READ_POLICY=JSON.stringify({sample:{orders:["status"]}});
+ await assert.rejects(inspect.listDocuments("other","staging","orders"),{code:"DOCUMENT_ACCESS_DENIED"});
+ await assert.rejects(inspect.listDocuments("sample","staging","users"),{code:"DOCUMENT_ACCESS_DENIED"});
+ await assert.rejects(inspect.listDocuments("sample","production","orders"),{code:"DOCUMENT_PRODUCTION_DISABLED"});
+ assert.equal(calls,0);
+});
+test("document list paginates and projects only specifically permitted user fields",async()=>{
+ process.env.MCP_DOCUMENT_READ_POLICY=JSON.stringify({sample:{orders:["status","_id"]}});
+ setup((url,opts)=>{
+  assert.ok(url.endsWith("/api/query"));
+  const body=JSON.parse(opts.body);
+  assert.equal(body.path,"_system/cli/tableData");
+  // Pagination arguments are encoded with Convex's official transport.
+  assert.ok(JSON.stringify(body).includes("orders"));
+  return json({status:"success",value:{
+   page:[{status:"pending",_id:"j123",customerEmail:"NO_EXPOSURE",internalSecret:"NO_EXPOSURE"}],
+   isDone:false,continueCursor:"cursor-next",
+  }});
+ });
+ const output=await inspect.listDocuments("sample","staging","orders",{limit:2,order:"asc"});
+ assert.deepEqual(output.page,[{status:"pending",_id:"j123"}]);
+ assert.equal(output.continueCursor,"cursor-next");
+ assert.equal(JSON.stringify(output).includes("NO_EXPOSURE"),false);
+});
+test("invalid document policy and out-of-range limits fail closed",async()=>{
+ let calls=0;global.fetch=async()=>{calls++;throw Error("no fetch")};
+ for(const fields of [["__proto__"],["constructor"],[],["status","status"],["bad.dot"]]){
+  process.env.MCP_DOCUMENT_READ_POLICY=JSON.stringify({sample:{orders:fields}});
+  await assert.rejects(inspect.listDocuments("sample","staging","orders"),{code:"DOCUMENT_ACCESS_DISABLED"});
+ }
+ process.env.MCP_DOCUMENT_READ_POLICY=JSON.stringify({sample:{orders:["status"]}});
+ for(const value of [0,21,1.2,"10"]){
+  await assert.rejects(inspect.listDocuments("sample","staging","orders",{limit:value}),{code:"INVALID_ARGUMENTS"});
+ }
+ assert.equal(calls,0);
+});
+test("malformed page and oversized projected values fail closed",async()=>{
+ process.env.MCP_DOCUMENT_READ_POLICY=JSON.stringify({sample:{orders:["status"]}});
+ setup(()=>json({status:"success",value:{page:[{status:"A".repeat(25000)}],isDone:true,continueCursor:"done"}}));
+ await assert.rejects(inspect.listDocuments("sample","staging","orders",{limit:1}),{code:"OUTPUT_TOO_LARGE"});
+ setup(()=>json({status:"success",value:{page:[{}],isDone:"yes",continueCursor:"end"}}));
+ await assert.rejects(inspect.listDocuments("sample","staging","orders",{limit:1}),{code:"CAPABILITY_UNAVAILABLE"});
+});
+
+test("document projection rejects nested objects instead of leaking nested personal data",async()=>{
+ process.env.MCP_DOCUMENT_READ_POLICY=JSON.stringify({sample:{orders:["metadata"]}});
+ setup(()=>json({status:"success",value:{
+  page:[{metadata:{publicName:"allowed?",privateEmail:"MUST_NOT_LEAK"}}],
+  isDone:true,continueCursor:"done",
+ }}));
+ await assert.rejects(inspect.listDocuments("sample","staging","orders"),{code:"DOCUMENT_FIELD_TYPE_UNSUPPORTED"});
+});

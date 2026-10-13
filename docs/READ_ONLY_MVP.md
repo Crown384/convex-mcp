@@ -23,7 +23,7 @@ Accept: application/json, text/event-stream
 
 Stateless JSON-RPC Streamable HTTP subset: initialize, notifications/initialized, ping, tools/list, tools/call. GET returns 405; there is no server-initiated streaming or session state. The MCP client must support supplying its bearer header; this is NOT yet OAuth-compatible with clients that require OAuth discovery. Do not claim working ChatGPT connection until real remote client authentication is implemented and tested.
 
-Available tools: projects_list, deployments_list, deployment_status, environment_names_list, tables_list, functions_list, usage_limits_list. New tools return bounded metadata only, not document values, environment secrets, or function execution. No arbitrary queries, run, deletes, mutations, environment values or unmanaged hosts.
+Available tools: projects_list, deployments_list, deployment_status, environment_names_list, tables_list, functions_list, usage_limits_list, documents_list. Metadata tools return only bounded metadata. The separate optional `documents_list` tool reads strictly allowlisted staging document scalar values; none of these tools exposes environment secret values or invokes application mutations. No arbitrary queries, run, deletes, mutations, environment values or unmanaged hosts.
 
 Example initialization:
 
@@ -40,3 +40,9 @@ Before live claims, validate the real deployed PamaENV machine API, real separat
 ## QA and rollback
 
 Execute corepack pnpm install --frozen-lockfile, pnpm lint, pnpm typecheck, pnpm test, pnpm build in Daytona. No real deployment keys needed for build, and absent configuration must fail closed. To roll back, revert the merged staging commit (do not change main). To revoke access immediately, revoke the PamaENV machine client and rotate MCP_ACCESS_TOKEN, then redeploy server.
+
+## Optional staging-only paginated data reads
+
+`documents_list` is **disabled by default**. It cannot access production document values, including when `MCP_ENABLE_PRODUCTION_READS=true`. Add a private **server-only** `MCP_DOCUMENT_READ_POLICY` JSON string of shape `{"sample":{"orders":["status","total"]}}` after reviewing fields. The exact project slug and exact table name must be listed, and **only** the named top-level fields will be returned. Allowlisted values must be top-level scalars (string, number, boolean or null); arrays and nested objects fail closed. No wildcard, recursive object projection or implicit access to document IDs. Maximum 20 rows per call and 24,000 characters per MCP result; cursor pagination is supported.
+
+**Security warning:** Convex deployment admin keys may bypass application RBAC, data-owner visibility and tenant isolation; the operator is responsible for explicitly choosing non-sensitive fields. This is a staging diagnostic aid, not a substitute for each application's authorized business functions. Production customer records and direct writes remain blocked. Revoking the PamaENV machine token blocks new requests; changing the document policy requires a server configuration rollout. Neither current tests nor the UI verify this against a live deployment.

@@ -6,9 +6,11 @@
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 import { withDeploymentCredential, convexGet, SafeError, boundedJson } from "./pama-env";
+import { allowedDocumentFields } from "./document-policy";
 
 const getSchemas = makeFunctionReference<"query">("_system/frontend/getSchemas");
 const getFunctions = makeFunctionReference<"query">("_system/cli/modules:apiSpec");
+const getTableData = makeFunctionReference<"query">("_system/cli/tableData");
 const validName = (name: unknown): name is string =>
   typeof name === "string" && /^[A-Za-z_][\w./:-]{0,199}$/.test(name);
 
@@ -115,5 +117,64 @@ export async function listUsageLimits(project: unknown, environment: unknown) {
         limit:row.limit,enabled:row.enabled};
     });
     return {project,environment,limits:limits.slice(0,50),truncated:limits.length>50};
+  });
+}
+
+/**
+ * Staging-only data browsing, guarded by server-configured project/table/field
+ * grants. Admin credentials bypass app-user authorization: the server must
+ * never infer document access from a deployment key alone.
+ */
+export async function listDocuments(
+  project: unknown, environment: unknown, table: unknown,
+  options: { order?: unknown; cursor?: unknown; limit?: unknown } = {},
+) {
+  // Production PII is never enabled by the metadata opt-in.
+  if (environment !== "staging") throw new SafeError("DOCUMENT_PRODUCTION_DISABLED");
+  const fields = allowedDocumentFields(project, table);
+  const limit = options.limit ?? 10;
+  const order = options.order ?? "desc";
+  const cursor = options.cursor ?? null;
+  if (!Number.isInteger(limit) || typeof limit !== "number" || limit<1 || limit>20 ||
+      (order!=="asc" && order!=="desc") ||
+      (cursor!==null && (typeof cursor!=="string" || cursor.length>2048 ||
+        !/^[\x21-\x7e]+$/.test(cursor)))) throw new SafeError("INVALID_ARGUMENTS");
+  return withDeploymentCredential(project, environment, async (url,key) => {
+    try {
+      const reply: unknown = await admin(url,key).query(getTableData,{
+        table, order, paginationOpts:{numItems:limit,cursor},
+      });
+      if (!reply || typeof reply !== "object" || Array.isArray(reply))
+        throw new SafeError("CAPABILITY_UNAVAILABLE");
+      const p = reply as Record<string,unknown>;
+      if (!Array.isArray(p.page) || p.page.length>limit || typeof p.isDone!=="boolean" ||
+          typeof p.continueCursor!=="string" || p.continueCursor.length>2048)
+        throw new SafeError("CAPABILITY_UNAVAILABLE");
+      const page = p.page.map((raw:unknown) => {
+        if (!raw || typeof raw!=="object" || Array.isArray(raw))
+          throw new SafeError("CAPABILITY_UNAVAILABLE");
+        const record = raw as Record<string,unknown>;
+        const safe:Record<string,unknown>={};
+        for (const field of fields) {
+          if (!Object.prototype.hasOwnProperty.call(record,field)) continue;
+          // Nested objects/arrays may contain unexpected personal fields;
+          // require future nested-field policies before exposing any of them.
+          const value = record[field];
+          if (value!==null && typeof value!=="string" &&
+              typeof value!=="number" && typeof value!=="boolean")
+            throw new SafeError("DOCUMENT_FIELD_TYPE_UNSUPPORTED");
+          if (typeof value==="number" && !Number.isFinite(value))
+            throw new SafeError("DOCUMENT_FIELD_TYPE_UNSUPPORTED");
+          safe[field]=value;
+        }
+        return safe;
+      });
+      const result = {project,environment,table,page,isDone:p.isDone,continueCursor:p.continueCursor};
+      if (JSON.stringify(result).length>24_000) throw new SafeError("OUTPUT_TOO_LARGE");
+      return result;
+    } catch (e) {
+      if (e instanceof SafeError) throw e;
+      throw new SafeError("CAPABILITY_UNAVAILABLE");
+    }
   });
 }
