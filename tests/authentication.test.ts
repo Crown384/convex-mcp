@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { betterAuth } from "better-auth/minimal";
 import { memoryAdapter } from "better-auth/adapters/memory";
@@ -9,7 +10,8 @@ import { sendSignInCode } from "../src/lib/auth/mailjet";
 const origin = "https://mcp.example.com";
 const resource = origin + "/api/mcp";
 let delivered: string;
-let auth: ReturnType<typeof betterAuth>;
+function makeAuth(db: Record<string, object[]>) { return betterAuth({ ...authOptions(async (_email, otp) => { delivered=otp; }), database: memoryAdapter(db) }); }
+let auth: ReturnType<typeof makeAuth>;
 const env = { ...process.env };
 function cookie(response: Response) {
   return response.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
@@ -33,9 +35,7 @@ beforeEach(() => {
   process.env.AUTH_ALLOWED_EMAILS="owner@example.com";
   delivered="";
   const db: Record<string, object[]> = Object.fromEntries(Object.keys(getAuthTables(authOptions())).map(key=>[key,[]]));
-  auth = betterAuth({ ...authOptions(async (_email, otp) => { delivered=otp; }),
-    database: memoryAdapter(db),
-  });
+  auth = makeAuth(db);
 });
 afterEach(() => { process.env={...env}; vi.restoreAllMocks(); });
 describe("real Better Auth email code handlers", () => {
@@ -96,5 +96,54 @@ describe("Mailjet delivery",() => {
     expect(JSON.parse(String(request.body)).Messages[0].TextPart).toContain("123456");
     fetchMock.mockResolvedValue(new Response("fake-secret 123456",{status:500}));
     await expect(sendSignInCode("owner@example.com","123456")).rejects.toThrow("MAIL_DELIVERY_FAILED");
+  });
+});
+
+async function oauthAccess() {
+  const cookies=await signIn();
+  const registration=await call("/oauth2/register",{client_name:"Test MCP",redirect_uris:["https://chatgpt.com/connector_platform/oauth/callback"],token_endpoint_auth_method:"none",grant_types:["authorization_code","refresh_token"],scope:"mcp:read offline_access"});
+  expect(registration.status).toBe(200);
+  const client=await registration.json();
+  const verifier="v".repeat(64);
+  const challenge=createHash("sha256").update(verifier).digest("base64url");
+  const query=new URLSearchParams({client_id:client.client_id,redirect_uri:client.redirect_uris[0],response_type:"code",scope:"mcp:read offline_access",resource,code_challenge:challenge,code_challenge_method:"S256",state:"test-state"});
+  const pending=await call("/oauth2/authorize?"+query,undefined,cookies);
+  const location=pending.headers.get("location");
+  expect(location).toContain("/consent");
+  const signedQuery=new URL(location!).searchParams.toString();
+  const consent=await call("/oauth2/consent",{accept:true,oauth_query:signedQuery},cookies);
+  expect(consent.status).toBe(200);
+  const redirect=await consent.json();
+  const callback=new URL(redirect.url);
+  expect(callback.searchParams.get("state")).toBe("test-state");
+  const code=callback.searchParams.get("code")!;
+  const tokenRequest={client_id:client.client_id,grant_type:"authorization_code",redirect_uri:client.redirect_uris[0],code,code_verifier:verifier,resource};
+  const issued=await call("/oauth2/token",tokenRequest);
+  expect(issued.status).toBe(200);
+  return {cookies,client,tokens:await issued.json(),tokenRequest,signedQuery};
+}
+describe("complete OAuth code flow",()=>{
+  it("issues a resource-bound token after consent and refuses code replay",async()=>{
+    const result=await oauthAccess();
+    expect(await authorizeMcp(auth,"Bearer "+result.tokens.access_token)).toMatchObject({clientId:result.client.client_id,scopes:["mcp:read"]});
+    expect((await call("/oauth2/token",result.tokenRequest)).status).not.toBe(200);
+    expect((await call("/oauth2/token",{...result.tokenRequest,resource:"https://evil.example.com"})).status).not.toBe(200);
+  });
+  it("blocks the issued token immediately after logout",async()=>{
+    const result=await oauthAccess();
+    await call("/sign-out",{},result.cookies);
+    await expect(authorizeMcp(auth,"Bearer "+result.tokens.access_token)).rejects.toThrow();
+  });
+  it("blocks the issued token immediately after consent revocation",async()=>{
+    const result=await oauthAccess();
+    const grants=await (await call("/oauth2/get-consents",undefined,result.cookies)).json();
+    expect(grants.length).toBe(1);
+    expect((await call("/oauth2/delete-consent",{id:grants[0].id},result.cookies)).status).toBe(200);
+    await expect(authorizeMcp(auth,"Bearer "+result.tokens.access_token)).rejects.toThrow();
+  });
+  it("rejects a token after removing owner authorization",async()=>{
+    const result=await oauthAccess();
+    process.env.AUTH_ALLOWED_EMAILS="different@example.com";
+    await expect(authorizeMcp(auth,"Bearer "+result.tokens.access_token)).rejects.toThrow();
   });
 });

@@ -1,8 +1,8 @@
-import type { betterAuth } from "better-auth/minimal";
+import type { Auth, BetterAuthOptions } from "better-auth/minimal";
 import { AuthFailure, authIssuer, mcpResource, MCP_SCOPE, ownerEmail } from "./settings";
 
 // Full backend validation on every call. No cached session or old personal-token fallback.
-export async function authorizeMcp(auth: ReturnType<typeof betterAuth>, authorization: string | null) {
+export async function authorizeMcp<T extends BetterAuthOptions>(auth: Auth<T>, authorization: string | null) {
   if (!authorization?.startsWith("Bearer ") || authorization.length > 8192) throw new AuthFailure();
   const token = authorization.slice(7);
   if (token.split(".").length !== 3 || /\s/.test(token)) throw new AuthFailure();
