@@ -62,6 +62,11 @@ it("persists email-code login in the real local Convex auth component",async()=>
   expect(refreshed.status).toBe(200);
   const rotated=await refreshed.json();
   expect(rotated.refresh_token).not.toBe(tokens.refresh_token);
+  const nextRefresh=await t.fetch("/api/auth/oauth2/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},
+    body:new URLSearchParams({client_id:client.client_id,grant_type:"refresh_token",refresh_token:rotated.refresh_token,
+      resource:"https://mcp.example.com/api/mcp"}).toString()});
+  expect(nextRefresh.status).toBe(200);
+  expect((await nextRefresh.json()).refresh_token).not.toBe(rotated.refresh_token);
   const replay=await t.fetch("/api/auth/oauth2/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},
     body:new URLSearchParams({client_id:client.client_id,grant_type:"refresh_token",refresh_token:tokens.refresh_token,
       resource:"https://mcp.example.com/api/mcp"}).toString()});
