@@ -19,8 +19,8 @@ function cookie(response: Response) {
 async function call(path: string, body?: object, cookies = "") {
   return auth.handler(new Request(origin + "/api/auth" + path, {
     method: body ? "POST" : "GET",
-    headers: { "content-type": "application/json", origin, cookie: cookies },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    headers: { "content-type": path==="/oauth2/token"?"application/x-www-form-urlencoded":"application/json", origin, cookie: cookies },
+    ...(body ? { body: path==="/oauth2/token"?new URLSearchParams(body as Record<string,string>).toString():JSON.stringify(body) } : {}),
   }));
 }
 async function signIn() {
