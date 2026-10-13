@@ -50,7 +50,7 @@ export async function boundedJson(response: Response, maxBytes = 64_000): Promis
       const { done, value } = await reader.read();
       if (done) break;
       length += value.byteLength;
-      if (length > 64_000) throw new SafeError("UPSTREAM_FAILURE");
+      if (length > maxBytes) throw new SafeError("UPSTREAM_FAILURE");
       chunks.push(value);
     }
   } finally {
