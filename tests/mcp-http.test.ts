@@ -27,7 +27,7 @@ it("official MCP client initializes and discovers all nine tools through the rea
   const client=new Client({name:"qa-client",version:"1"});
   const transport=new StreamableHTTPClientTransport(new URL("https://mcp.example.com/api/mcp"),{
     requestInit:{headers:{authorization:"Bearer fake-oauth-token"}},
-    fetch:async(input,init)=>mcpPost(new Request(input,init)),
+    fetch:async(input,init)=>{const request=new Request(input,init);request.headers.set("host",new URL(request.url).host);return mcpPost(request);},
   });
   await client.connect(transport);
   expect((await client.listTools()).tools).toHaveLength(9);
