@@ -121,3 +121,35 @@ test("document projection rejects nested objects instead of leaking nested perso
  }}));
  await assert.rejects(inspect.listDocuments("sample","staging","orders"),{code:"DOCUMENT_FIELD_TYPE_UNSUPPORTED"});
 });
+
+test("logs metadata strips raw secrets, messages and error stack while filtering",async()=>{
+ setup((url,opts)=>{
+  assert.equal(url,"https://happy-capybara-123.convex.cloud/api/stream_function_logs?cursor=0");
+  assert.equal(opts.method,"GET");
+  return json({newCursor:45,entries:[
+    {kind:"Completion",identifier:"orders:list",udfType:"Query",timestamp:12,
+      error:null, logLines:["API_TOKEN=DO_NOT_LEAK"]},
+    {kind:"Completion",identifier:"orders:update",udfType:"Mutation",timestamp:13,
+      error:{message:"Private password NEVER_EXPOSE",stack:"stack detail"},logLines:["PII"]},
+    {kind:"Progress",identifier:"orders:wait",udfType:"Action",timestamp:14,logLines:["raw"]}
+  ]});
+ });
+ const failures=await inspect.recentLogMetadata("sample","staging",{status:"failure"});
+ assert.deepEqual(failures.entries,[{kind:"Completion",udfType:"Mutation",identifier:"orders:update",failed:true,timestamp:13}]);
+ assert.equal(failures.newCursor,45);
+ assert.equal(JSON.stringify(failures).includes("NEVER_EXPOSE"),false);
+ assert.equal(JSON.stringify(failures).includes("DO_NOT_LEAK"),false);
+ const all=await inspect.recentLogMetadata("sample","staging",{limit:2});
+ assert.equal(all.entries.length,2);
+});
+test("log reads deny production before secrets and reject invalid pagination",async()=>{
+ let calls=0;global.fetch=async()=>{calls++;throw Error("unexpected fetch")};
+ await assert.rejects(inspect.recentLogMetadata("sample","production"),{code:"LOG_PRODUCTION_DISABLED"});
+ await assert.rejects(inspect.recentLogMetadata("sample","staging",{cursor:-1}),{code:"INVALID_ARGUMENTS"});
+ await assert.rejects(inspect.recentLogMetadata("sample","staging",{limit:200}),{code:"INVALID_ARGUMENTS"});
+ assert.equal(calls,0);
+});
+test("logs fail closed for upstream malformed entries",async()=>{
+ setup(()=>json({newCursor:10,entries:[null]}));
+ await assert.rejects(inspect.recentLogMetadata("sample","staging"),{code:"CAPABILITY_UNAVAILABLE"});
+});
