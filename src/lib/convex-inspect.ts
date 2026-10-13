@@ -14,7 +14,8 @@ const validName = (name: unknown): name is string =>
 
 function admin(url: URL, key: string): ConvexHttpClient {
   const client = new ConvexHttpClient(url.origin, { logger: false, fetch: globalThis.fetch });
-  client.setAdminAuth(key);
+  // This internal API is used by Convex CLI; its runtime method predates public typings.
+  (client as unknown as { setAdminAuth(value: string): void }).setAdminAuth(key);
   return client;
 }
 
