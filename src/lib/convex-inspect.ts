@@ -44,9 +44,7 @@ export async function listTables(project: unknown, environment: unknown) {
         redirect:"error",cache:"no-store",signal:AbortSignal.timeout(10_000),
       });
       if (!response.ok) throw new SafeError("CAPABILITY_UNAVAILABLE");
-      const text = await response.text();
-      if (Buffer.byteLength(text,"utf8") > 256_000) throw new SafeError("CAPABILITY_UNAVAILABLE");
-      const shapes: unknown = JSON.parse(text);
+      const shapes: unknown = await boundedJson(response, 256_000);
       if (!shapes || typeof shapes !== "object" || Array.isArray(shapes) ||
           Object.keys(shapes).length > 500 || !Object.keys(shapes).every(validName))
         throw new SafeError("CAPABILITY_UNAVAILABLE");
