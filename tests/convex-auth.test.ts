@@ -1,4 +1,4 @@
-/// <reference types="vite/client" />
+declare global { interface ImportMeta { glob(pattern:string):Record<string,()=>Promise<unknown>>; } }
 import { createHash } from "node:crypto";
 import { beforeEach,afterEach,expect,it,vi } from "vitest";
 import { convexTest } from "convex-test";

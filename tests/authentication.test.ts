@@ -147,3 +147,42 @@ describe("complete OAuth code flow",()=>{
     await expect(authorizeMcp(auth,"Bearer "+result.tokens.access_token)).rejects.toThrow();
   });
 });
+
+describe("additional authentication negatives",()=>{
+  it("denies altered signatures, expired tokens, and incorrect audience",async()=>{
+    const result=await oauthAccess();
+    const parts=result.tokens.access_token.split(".");
+    parts[2]=(parts[2][0]==="a"?"b":"a")+parts[2].slice(1);
+    await expect(authorizeMcp(auth,"Bearer "+parts.join("."))).rejects.toThrow();
+    const payload=JSON.parse(Buffer.from(result.tokens.access_token.split(".")[1],"base64url").toString());
+    const signed=await auth.api.signJWT({body:{payload:{...payload,aud:"https://evil.example.com"},override:true}});
+    await expect(authorizeMcp(auth,"Bearer "+signed.token)).rejects.toThrow();
+    const expired=await auth.api.signJWT({body:{payload:{...payload,exp:1},override:true}});
+    await expect(authorizeMcp(auth,"Bearer "+expired.token)).rejects.toThrow();
+  });
+  it("refreshes with rotation and rejects refresh-token replay",async()=>{
+    const result=await oauthAccess();
+    const response=await call("/oauth2/token",{client_id:result.client.client_id,grant_type:"refresh_token",refresh_token:result.tokens.refresh_token,resource});
+    expect(response.status).toBe(200);
+    const rotated=await response.json();
+    expect(await authorizeMcp(auth,"Bearer "+rotated.access_token)).toMatchObject({clientId:result.client.client_id});
+    expect((await call("/oauth2/token",{client_id:result.client.client_id,grant_type:"refresh_token",refresh_token:result.tokens.refresh_token,resource})).status).not.toBe(200);
+  });
+  it("rejects tampered consent request parameters",async()=>{
+    const result=await oauthAccess();
+    const tampered=new URLSearchParams(result.signedQuery);
+    tampered.set("scope","mcp:write");
+    expect((await call("/oauth2/consent",{accept:true,oauth_query:tampered.toString()},result.cookies)).status).not.toBe(200);
+  });
+  it("hashes OTP records and expires them after five minutes",async()=>{
+    await call("/email-otp/send-verification-otp",{email:"owner@example.com",type:"sign-in"});
+    const context=await auth.$context;
+    const record=await context.adapter.findOne<{value:string}>({model:"verification",where:[{field:"identifier",value:"sign-in-otp-owner@example.com"}]});
+    expect(record).not.toBeNull();
+    expect(record!.value).not.toContain(delivered);
+    vi.useFakeTimers({toFake:["Date"]});
+    vi.setSystemTime(Date.now()+301000);
+    try {expect((await call("/sign-in/email-otp",{email:"owner@example.com",otp:delivered})).status).not.toBe(200);}
+    finally {vi.useRealTimers();}
+  });
+});
