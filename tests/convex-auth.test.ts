@@ -64,3 +64,37 @@ it("persists email-code login in the real local Convex auth component",async()=>
   const denied=await t.fetch("/api/mcp/check",{method:"POST",headers:{authorization:"Bearer "+"x".repeat(48)}});
   expect(denied.status).toBe(401);
 });
+
+it("allows only one concurrent use of a valid email code",async()=>{
+  const t=convexTest(schema,import.meta.glob("../convex/**/*.ts"));
+  t.registerComponent("betterAuth",authSchema,{...import.meta.glob("../convex/betterAuth/**/*.ts"),
+    "../convex/betterAuth/_generated/server.ts":()=>import("../convex/_generated/server")});
+  let otp="";
+  vi.spyOn(globalThis,"fetch").mockImplementation(async(_url,options)=>{
+    otp=JSON.parse(String(options?.body)).Messages[0].TextPart.match(/is (\d{6})/)[1];
+    return Response.json({Messages:[{Status:"success"}]});
+  });
+  const headers={"content-type":"application/json",origin:"https://mcp.example.com"};
+  const send=()=>t.fetch("/api/auth/email-otp/send-verification-otp",{method:"POST",headers,
+    body:JSON.stringify({email:"owner@example.com",type:"sign-in"})});
+  const verify=()=>t.fetch("/api/auth/sign-in/email-otp",{method:"POST",headers,
+    body:JSON.stringify({email:"owner@example.com",otp})});
+  await send();expect((await verify()).status).toBe(200);
+  await send();
+  const responses=await Promise.all([verify(),verify(),verify()]);
+  expect(responses.filter(response=>response.status===200)).toHaveLength(1);
+});
+it("limits OTP requests even when no client IP header exists",async()=>{
+  const t=convexTest(schema,import.meta.glob("../convex/**/*.ts"));
+  t.registerComponent("betterAuth",authSchema,{...import.meta.glob("../convex/betterAuth/**/*.ts"),
+    "../convex/betterAuth/_generated/server.ts":()=>import("../convex/_generated/server")});
+  vi.spyOn(globalThis,"fetch").mockResolvedValue(Response.json({Messages:[{Status:"success"}]}));
+  const statuses=[];
+  for(let i=0;i<4;i++){
+    const response=await t.fetch("/api/auth/email-otp/send-verification-otp",{method:"POST",
+      headers:{"content-type":"application/json",origin:"https://mcp.example.com"},
+      body:JSON.stringify({email:"owner@example.com",type:"sign-in"})});
+    statuses.push(response.status);
+  }
+  expect(statuses).toEqual([200,200,200,429]);
+});
