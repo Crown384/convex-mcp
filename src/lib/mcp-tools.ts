@@ -1,5 +1,5 @@
 import { getDeploymentStatus, getEnvironmentNames, listProjects, SafeError, validEnvironment, validSlug } from "./pama-env";
-import { listTables, listFunctions, listUsageLimits, listDocuments } from "./convex-inspect";
+import { listTables, listFunctions, listUsageLimits, listDocuments, recentLogMetadata } from "./convex-inspect";
 
 export const toolDefinitions = [
   {
@@ -43,6 +43,16 @@ export const toolDefinitions = [
       table: {type:"string"}, order:{type:"string",enum:["asc","desc"]},
       limit:{type:"integer",minimum:1,maximum:20}, cursor:{type:"string"}
     }, required:["project","environment","table"],additionalProperties:false },
+    annotations: {readOnlyHint:true},
+  },
+  {
+    name: "logs_recent",
+    description: "Read recent staging-only Convex function-execution metadata, with failure filtering. Never returns raw logs, exception text, stack traces or argument values; production is denied.",
+    inputSchema: { type:"object", properties: {
+      project:{type:"string"},environment:{type:"string",enum:["staging"]},
+      cursor:{type:"integer",minimum:0},limit:{type:"integer",minimum:1,maximum:30},
+      status:{type:"string",enum:["all","success","failure"]},
+    },required:["project","environment"],additionalProperties:false },
     annotations: {readOnlyHint:true},
   },
   {
@@ -93,6 +103,14 @@ export async function runTool(name: unknown, argumentsInput: unknown): Promise<u
       if (!validSlug(args.project) || args.environment !== "staging") throw new SafeError("DOCUMENT_PRODUCTION_DISABLED");
       return listDocuments(args.project,args.environment,args.table,{
         order:args.order,cursor:args.cursor,limit:args.limit,
+      });
+    }
+    case "logs_recent": {
+      const args = exactArguments(argumentsInput,["project","environment","cursor","limit","status"]);
+      if (!validSlug(args.project) || args.environment!=="staging")
+        throw new SafeError("LOG_PRODUCTION_DISABLED");
+      return recentLogMetadata(args.project,args.environment,{
+        cursor:args.cursor,limit:args.limit,status:args.status,
       });
     }
     case "environment_names_list": {

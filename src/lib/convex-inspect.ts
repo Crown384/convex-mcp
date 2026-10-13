@@ -178,3 +178,67 @@ export async function listDocuments(
     }
   });
 }
+
+/**
+ * Staging-only execution diagnostics. Intentionally project just structural
+ * metadata. Never return raw logs, argument values, stack traces or messages:
+ * these frequently contain tokens or personal data.
+ */
+export async function recentLogMetadata(
+  project: unknown, environment: unknown,
+  options: {cursor?: unknown; limit?: unknown; status?: unknown} = {},
+) {
+  if (environment !== "staging") throw new SafeError("LOG_PRODUCTION_DISABLED");
+  const limit = options.limit ?? 20;
+  const cursor = options.cursor ?? 0;
+  const status = options.status ?? "all";
+  if (typeof limit !== "number" || !Number.isInteger(limit) || limit<1 || limit>30 ||
+      typeof cursor!=="number" || !Number.isSafeInteger(cursor) || cursor<0 ||
+      (status!=="all" && status!=="failure" && status!=="success"))
+    throw new SafeError("INVALID_ARGUMENTS");
+  return withDeploymentCredential(project,environment,async(url,key)=>{
+    try {
+      const response = await fetch(url.origin + "/api/stream_function_logs?cursor=" + cursor,{
+        method:"GET",headers:{Authorization:"Convex " + key,Accept:"application/json"},
+        cache:"no-store",redirect:"error",signal:AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) throw new SafeError("CAPABILITY_UNAVAILABLE");
+      const raw=await boundedJson(response,256_000);
+      if (!raw || typeof raw!=="object" || Array.isArray(raw))
+        throw new SafeError("CAPABILITY_UNAVAILABLE");
+      const payload=raw as Record<string,unknown>;
+      if (!Array.isArray(payload.entries) || payload.entries.length>1000 ||
+          typeof payload.newCursor!=="number" || !Number.isSafeInteger(payload.newCursor) ||
+          payload.newCursor<cursor) throw new SafeError("CAPABILITY_UNAVAILABLE");
+      const entries = payload.entries.filter((entry:unknown)=>{
+        if (!entry || typeof entry!=="object" || Array.isArray(entry))
+          throw new SafeError("CAPABILITY_UNAVAILABLE");
+        const row=entry as Record<string,unknown>;
+        const failed=row.kind==="Completion" && row.error!=null;
+        return status==="all" || (status==="failure" && failed) ||
+          (status==="success" && row.kind==="Completion" && !failed);
+      }).slice(-limit).map((entry:unknown)=>{
+        const row=entry as Record<string,unknown>;
+        const kind=row.kind;
+        const udfType=row.udfType;
+        // Only safe enums. Function identifiers can be user-generated; return
+        // only identifiers strictly matching deployment function-path syntax.
+        const identifier=row.identifier;
+        return {
+          kind:kind==="Completion"?"Completion":"Progress",
+          udfType:udfType==="Query"||udfType==="Mutation"||udfType==="Action"||udfType==="HttpAction"
+            ? udfType:"Unknown",
+          identifier:validName(identifier)?identifier:"[redacted]",
+          failed:kind==="Completion" && row.error!=null,
+          timestamp:typeof row.timestamp==="number" && Number.isFinite(row.timestamp)
+            ? row.timestamp:null,
+        };
+      });
+      return {project,environment,entries,newCursor:payload.newCursor,
+        note:"Metadata only. Error text, stack traces and console log lines are withheld."};
+    } catch (e) {
+      if (e instanceof SafeError) throw e;
+      throw new SafeError("CAPABILITY_UNAVAILABLE");
+    }
+  });
+}
