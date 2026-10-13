@@ -10,7 +10,7 @@ Build a secure, remotely accessible, **multi-project Convex management MCP serve
 
 The platform uses **Next.js for UI and the remote MCP endpoint** and **Convex for its own registry, metadata, policies, approvals, and audit records**. It connects outward to *other* Convex projects through documented APIs and separately authorized credentials. It does not magically discover or access projects for which it has no authorization.
 
-Primary use case: inspect Pamastore production for pending seller verification, examine an application record safely, then execute an **explicitly authorized application-defined verification operation** (not an arbitrary database patch). Also support Track, PamaOS, Vasta, Eden projects, and other registered deployments.
+Core use case: securely inspect and operate through approved Convex capabilities on **any** registered project (Track, Pamastore, PamaOS, Vasta, Eden and future projects), with exact deployment policy, application-owned business rules, and human approval for sensitive operations. Named applications are examples, not core integration work items.
 
 Do not confuse this product with:
 - **Convex's official local MCP server** (a reference for capabilities and semantics).
@@ -68,7 +68,7 @@ At the time of writing, `Crown384/convex-mcp` is effectively the **get-convex/te
 4. Add or update focused tests for changed behavior. Run the **smallest sufficient local validation** first, then broader checks when justified. Conserve GitHub Actions minutes; avoid redundant CI runs and unnecessary workflows.
 5. Report exact branch, commit SHA, changed files, tests actually run, security impact, unresolved blockers, and manual verification steps. Never claim “all tests pass” if they were not run.
 6. Require QA review for auth, credential, cross-project, production-write, MCP transport and deployment changes; address review findings and request re-review.
-7. Do **not merge into `main`**, deploy production, connect real credentials, or operate on live Pamastore accounts without explicit owner authorization. Do not auto-merge a PR just because checks are green.
+7. Do **not merge into `main`**, deploy production, connect real credentials, or operate on any live application's user accounts without explicit owner authorization. Do not auto-merge a PR just because checks are green.
 8. Configure Vercel so **`main` is the production deployment source**. Avoid unnecessary preview builds for every feature branch, per owner preference; verify the exact Vercel configuration rather than assuming a `vercel.json` build command prevents previews.
 9. Destroy ephemeral test environments/sandboxes when finished. Never leave costly or privileged sandboxes running without permission.
 10. Keep PRs narrow. No speculative polish while critical permission boundaries are unfinished.
@@ -83,7 +83,7 @@ Follow **[PROJECT_SPEC.md](./PROJECT_SPEC.md)**, which defines MVP scope, exact 
 - **Phase 1: control plane.** Secure sign-in, project/deployment registry, encrypted credential storage, permission engine and audit log.
 - **Phase 2: read-only MCP.** Authenticated remote endpoint + verified project/deployment discovery, tables, documents, function metadata, logs, diagnostics with pagination/redaction.
 - **Phase 3: guarded admin operations.** Explicit approvals, replay prevention, application function allowlists, safe function calls and carefully scoped write tools.
-- **Phase 4: Pamastore pilot.** After reviewing actual Pamastore code, expose an authorized `sellers_pending_list` + verification request workflow using app-side business logic. Never promise this is ready before end-to-end testing.
+- **Phase 4: generic function-execution pilot.** Validate an allowed application-owned function on a disposable Convex development deployment with approval, replay prevention and audit. No application-specific adapters are required.
 - **Phase 5: production readiness.** Threat-model pass, integration tests, monitoring, backup/recovery of control plane, key rotation, Vercel/Convex deployment, MCP client connectivity tests.
 - **Later:** richer usage/metrics/backup management, multi-user delegation, trusted PamaENV integration, batch operations and advanced discovery as independently reviewed features.
 

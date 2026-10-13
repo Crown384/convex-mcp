@@ -2,7 +2,7 @@
 
 A personal-use, mobile-friendly **read-only Convex control plane**, with Next.js dashboard and an authenticated HTTP MCP endpoint. The server uses **PamaENV** to discover explicitly delegated projects and resolve deployment-scoped Convex credentials server-to-server. No deploy keys are returned to browsers or MCP clients.
 
-**Current status: read-only MVP implemented, not remotely deployed or connected to live credentials.** There is no OAuth authorization server, public user login, unrestricted document inspector, production mutation endpoint, or completed Pamastore business workflow. The owner dashboard uses a single server-configured personal bearer token, held only in the tab's memory. Do not confuse passing local checks with real upstream integration or ChatGPT compatibility.
+**Current status: read-only MVP implemented, not remotely deployed or connected to live credentials.** There is no OAuth authorization server, public user login, unrestricted document inspector, production mutation endpoint, or approved application-function execution. The owner dashboard uses a single server-configured personal bearer token, held only in the tab's memory. Do not confuse passing local checks with real upstream integration or ChatGPT compatibility.
 
 Read [PROJECT_SPEC.md](./PROJECT_SPEC.md) and [AGENTS.md](./AGENTS.md) for the complete product specification and engineering rules. [Read-only setup and security limitations](./docs/READ_ONLY_MVP.md) is the operational manual for this milestone.
 

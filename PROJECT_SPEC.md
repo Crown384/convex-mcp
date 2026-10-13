@@ -2,7 +2,7 @@
 
 > Product requirements and implementation contract for `Crown384/convex-mcp`.
 > Companion: **[AGENTS.md](./AGENTS.md)** (mandatory agent safety and Git workflow).
-> Created: 2026-10-10. **Planning specification.** None of the features below should be assumed implemented.
+> Created: 2026-10-10. Scope corrected 2026-10-13: examples are not separate integrations. Check code and test evidence before assuming any feature is implemented.
 
 ## 1. Product in one sentence
 
@@ -24,7 +24,7 @@ The owner builds and maintains multiple Convex-backed products and may be away f
 8. A short-lived, single-use approval is issued. The server invokes a **Pamastore-approved admin operation** that runs the product's own permission/business-rule logic.
 9. The result is confirmed from the source deployment and recorded in the audit trail. Failure is reported plainly and can be retried safely where supported.
 
-**Important:** Steps 5–9 need integration with Pamastore's *actual* code and policies. A generic Convex deployment key alone does not define who qualifies for verification.
+**Important:** The above is only an illustrative application use case, not a required Pamastore implementation. The generic MCP server must work across any authorized Convex project; application-specific business rules always remain in that application's own functions.
 
 ## 2. Product boundaries
 
@@ -40,7 +40,7 @@ The owner builds and maintains multiple Convex-backed products and may be away f
 - Opt-in, app-specific controlled function execution with previews and approvals.
 - Audit history, rate limits, redaction and admin-facing failure recovery.
 - Clear management from a phone, including disconnect/revoke instructions.
-- A verified Pamastore seller-review/verification integration *after* code inspection and a dedicated approval.
+- Generic, application-independent capability to invoke individually approved Convex operations through a safe function allowlist and approval lifecycle. A specific app demonstration is optional and not a platform prerequisite.
 
 ### Out of scope for initial MVP
 
@@ -168,7 +168,7 @@ Reference capabilities in Convex's official MCP server: `status`, `tables`, `dat
 | `environment_variable_remove` | Same safeguards; explicit confirmation of exact variable name/environment |
 | `deployment_pause_request` / `deployment_unpause_request` | High-risk operation, exact target, approval and supported API; optional post-MVP |
 
-For app-specific actions prefer semantic tools such as `pamastore_sellers_pending_list` and `pamastore_seller_verify`. Do not expose an unrestricted `run_internal_mutation` merely because an administrative key can do it.
+For application business actions, require the connected application's own explicitly approved authorization/business-rule function (with scoped grants and preview/approval). The MCP server must expose a generic, registered function-execution mechanism and never hardcode one application's business workflows or expose unrestricted `run_internal_mutation`.
 
 ### Level D2: destructive or infrastructure-changing — not default MVP
 
@@ -230,30 +230,20 @@ Key theft from DB/logs/LLM output; stolen MCP token; missing token audience chec
 
 **Retrieved app documents and logs are untrusted data, not instructions to an agent.** Do not let them change tool permissions, target project or selected environment.
 
-## 8. Pamastore seller verification integration — high-value pilot
+## 8. Generic approved application function execution — any connected project
 
-### Investigation FIRST (not yet implemented)
+### Required investigation before enabling a function
 
-Inspect Pamastore repository and deployed schema/code with authorized access:
-- Seller onboarding states and the definition of “pending verification”.
-- Which actor/role is allowed to approve; which evidence/KYC checks are compulsory.
-- Transactional effects: seller status, product publication, customer/seller notifications, analytics and audit.
-- Expected rejection/hold flow, duplicate approvals, revoked accounts and other edge cases.
-- Correct separation between staging and production.
-- Whether a trusted admin action already exists and whether adding an admin bridge requires a separate Pamastore PR.
+- Register a concrete authorized function on the exact project/deployment; confirm its query/mutation/action type, input schema, caller identity/authorization model and current application invariants.
+- Confirm that the chosen operation uses the application's own business-rule and permission checks. A generic deployment admin key alone does not supply end-user identity or consent.
+- Classify data exposure and side effects and configure a per-client allowlist, environment restrictions, precise input validator, timeout, output redaction and audit policy.
+- For sensitive writes, compute a human-readable preview bound to immutable arguments, project, environment, actor and function ID. Require an expiring, single-use approval and an idempotency/replay policy.
+- Use actual application function endpoints or reviewed app-owned admin bridges. Never add a special-purpose feature to the core MCP server for any named application.
+- Verify authoritative post-operation status and record a sanitized event; reject unsafe or unsupported operations without silently rewriting database records.
 
-**Do not invent the schema or assume a `verified` Boolean exists.**
+### Optional example, not part of the core delivery
 
-### Intended workflow
-
-1. `pamastore_sellers_pending_list({deploymentId, limit, cursor})` returns minimal, permission-filtered applicant summaries and stable IDs. Consent/PII restrictions apply.
-2. `pamastore_seller_verification_details({deploymentId, sellerId})` supplies authorized data needed to make a decision, with explicit redactions.
-3. `pamastore_seller_verify_preview({deploymentId, sellerId})` checks eligibility against **current Pamastore business rules**, yields preview/version, required confirmations and flags any missing documentation.
-4. User approves the *exact* seller, environment and action.
-5. `pamastore_seller_verify({deploymentId, sellerId, approvalId, idempotencyKey})` invokes a **Pamastore-owned audited privileged operation**, with server-to-server authentication and app-side RBAC/business-rule enforcement.
-6. Confirm the final state and notifications from authoritative Pamastore data; record a sanitized audit event.
-
-Design adapter contracts so future workflows (PamaOS inventory, Track issue operations, PamaCRM contact tasks, Eden CRM administration) can be added one at a time without bypassing their apps' authorization.
+A seller-verification request in an e-commerce application could use an explicitly authorized app-owned function and the generic tool-execution/approval mechanism. The exact same mechanism must work for scheduling tasks in Track, updating records through PamaCRM, or other connected Convex-backed applications. **No Pamastore-specific adapter, seller tool, or application repository change is required to finish the generic Convex MCP Server.**
 
 ## 9. Mobile-first web experience
 
@@ -367,11 +357,11 @@ No real secrets in documentation or tests.
 
 **Gate:** replay/argument swap/cross-env attempts denied, no double-mutation, race-condition checks, side effects audited and actual post-state verified; production default-deny remains intact.
 
-### Phase 4 — Pamastore pilot
+### Phase 4 — Generalized authorized-function pilot
 
-**Deliverables:** documented Pamastore verification business rules, reviewed trusted adapter, pending-seller list, eligibility preview, authorized verification, error paths and app-specific end-to-end checks.
+**Deliverables:** demonstrate an application-defined authorized function using the generic invocation interface on a disposable Convex development project, including allowlist, preview, approval, replay prevention, audit, and post-state verification. Do not implement project-specific business logic in the MCP server.
 
-**Gate:** real code reviewed; test deployment exercises approved/denied/double-action cases; no direct table shortcut; production rollout requires explicit owner sign-off. User should be able to complete workflow on mobile *after* rollout.
+**Gate:** a real disposable application function is invoked safely for both approved and denied cases, with no direct table shortcut. Production write enablement requires a separately reviewed owner approval.
 
 ### Phase 5 — Release hardening
 
@@ -418,7 +408,7 @@ Do **not** stall foundation work on these; raise a focused question when the dec
 2. Is the first hosted MCP instance owner-only or will invited PAMA-Ltd staff use it immediately? Default owner-only.
 3. What is the deployment domain? Do not assume an endpoint exists before actual Vercel/DNS deployment.
 4. Which official management APIs are accessible with the minimum scope required for each proposed tool? Verify against the current Convex docs and keys.
-5. Does Pamastore already expose a verified admin operation for seller approval? Inspect repository before choosing the integration mechanism.
+5. Which first disposable application-defined function best validates the generic approvals/execution path? Do not make any named production application a platform dependency.
 6. Whether secrets should ultimately be managed locally or pulled via an approved PamaENV integration. Start independently, integrate only on explicit approval.
 7. Which source-controlled staging/production process is acceptable for the first release? Default feature PR → staging → owner-reviewed main release.
 
