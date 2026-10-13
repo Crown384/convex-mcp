@@ -49,3 +49,17 @@ test("Convex query authorization failure is not mistaken for an empty table list
  setup(url=>url.endsWith("/api/query")?new Response("No",{status:403}):json({}));
  await assert.rejects(inspect.listTables("sample","staging"),{code:"CAPABILITY_UNAVAILABLE"});
 });
+
+test("function metadata excludes arbitrary upstream fields and never executes functions",async()=>{
+ setup(url=>{
+  assert.ok(url.endsWith("/api/query"),"unexpected API call");
+  return json({status:"success",value:[{identifier:"orders:list",functionType:"query",visibility:"public",
+    source:"not-exposed",secret:"SENSITIVE"}, {identifier:"orders:approve",functionType:"mutation",visibility:"internal"}]});
+ });
+ const output=await inspect.listFunctions("sample","staging");
+ assert.deepEqual(output.functions,[
+  {identifier:"orders:list",type:"query",visibility:"public"},
+  {identifier:"orders:approve",type:"mutation",visibility:"internal"}
+ ]);
+ assert.equal(JSON.stringify(output).includes("SENSITIVE"),false);
+});
