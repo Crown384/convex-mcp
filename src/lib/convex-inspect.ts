@@ -5,7 +5,7 @@
  */
 import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
-import { withDeploymentCredential, convexGet, SafeError } from "./pama-env";
+import { withDeploymentCredential, convexGet, SafeError, boundedJson } from "./pama-env";
 
 const getSchemas = makeFunctionReference<"query">("_system/frontend/getSchemas");
 const getFunctions = makeFunctionReference<"query">("_system/cli/modules:apiSpec");
