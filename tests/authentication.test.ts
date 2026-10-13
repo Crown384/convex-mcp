@@ -1,0 +1,99 @@
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
+import { betterAuth } from "better-auth/minimal";
+import { memoryAdapter } from "better-auth/adapters/memory";
+import { authOptions } from "../src/lib/auth/options";
+import { authorizeMcp } from "../src/lib/auth/authorize";
+import { sendSignInCode } from "../src/lib/auth/mailjet";
+
+const origin = "https://mcp.example.com";
+const resource = origin + "/api/mcp";
+let delivered: string;
+let auth: ReturnType<typeof betterAuth>;
+const env = { ...process.env };
+function cookie(response: Response) {
+  return response.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+}
+async function call(path: string, body?: object, cookies = "") {
+  return auth.handler(new Request(origin + "/api/auth" + path, {
+    method: body ? "POST" : "GET",
+    headers: { "content-type": "application/json", origin, cookie: cookies },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  }));
+}
+async function signIn() {
+  expect((await call("/email-otp/send-verification-otp", {email:"owner@example.com",type:"sign-in"})).status).toBe(200);
+  const response = await call("/sign-in/email-otp", {email:"owner@example.com",otp:delivered});
+  expect(response.status).toBe(200);
+  return cookie(response);
+}
+beforeEach(() => {
+  process.env.AUTH_SITE_URL=origin;
+  process.env.BETTER_AUTH_SECRET="s".repeat(48);
+  process.env.AUTH_ALLOWED_EMAILS="owner@example.com";
+  delivered="";
+  const db: Record<string, object[]> = {};
+  auth = betterAuth({ ...authOptions(async (_email, otp) => { delivered=otp; }),
+    database: memoryAdapter(db),
+  });
+});
+afterEach(() => { process.env={...env}; vi.restoreAllMocks(); });
+describe("real Better Auth email code handlers", () => {
+  it("sends a code, creates a verified owner session, and refuses code replay", async () => {
+    const cookies=await signIn();
+    expect(delivered).toMatch(/^\d{6}$/);
+    const session=await (await call("/get-session",undefined,cookies)).json();
+    expect(session.user.emailVerified).toBe(true);
+    expect(session.user.email).toBe("owner@example.com");
+    expect((await call("/sign-in/email-otp",{email:"owner@example.com",otp:delivered})).status).not.toBe(200);
+    expect(cookies).toContain("session_token");
+  });
+  it("refuses an unlisted email before sending any code",async () => {
+    const response=await call("/email-otp/send-verification-otp",{email:"stranger@example.com",type:"sign-in"});
+    expect(response.status).toBe(403);
+    expect(delivered).toBe("");
+  });
+  it("invalidates the code after three incorrect attempts",async () => {
+    await call("/email-otp/send-verification-otp",{email:"owner@example.com",type:"sign-in"});
+    const correct=delivered;
+    for(let i=0;i<3;i++) expect((await call("/sign-in/email-otp",{email:"owner@example.com",otp:"000000"===correct?"111111":"000000"})).status).not.toBe(200);
+    expect((await call("/sign-in/email-otp",{email:"owner@example.com",otp:correct})).status).not.toBe(200);
+  });
+  it("sign-out destroys the owner session",async () => {
+    const cookies=await signIn();
+    expect((await call("/sign-out",{},cookies)).status).toBe(200);
+    expect(await (await call("/get-session",undefined,cookies)).json()).toBeNull();
+  });
+});
+describe("OAuth and MCP resource boundary",() => {
+  it("publishes OAuth metadata, requires S256 PKCE, and rejects unknown scopes",async () => {
+    const metadata=await (await call("/.well-known/oauth-authorization-server")).json();
+    expect(metadata.issuer).toBe(origin+"/api/auth");
+    expect(metadata.code_challenge_methods_supported).toEqual(["S256"]);
+    const response=await call("/oauth2/register",{client_name:"Test",redirect_uris:["https://chatgpt.com/connector_platform/oauth/callback"],token_endpoint_auth_method:"none",grant_types:["authorization_code","refresh_token"],scope:"mcp:read offline_access"});
+    expect(response.status).toBe(200);
+    const client=await response.json();
+    const query=new URLSearchParams({client_id:client.client_id,redirect_uri:client.redirect_uris[0],response_type:"code",scope:"mcp:read",resource});
+    const denied=await call("/oauth2/authorize?"+query);
+    expect(denied.status).not.toBe(200);
+    query.set("code_challenge","a".repeat(43));query.set("code_challenge_method","plain");
+    expect((await call("/oauth2/authorize?"+query)).status).not.toBe(200);
+  });
+  it("does not treat an owner session token or the old bearer as an MCP access token",async () => {
+    await expect(authorizeMcp(auth,"Bearer "+"a".repeat(48))).rejects.toThrow();
+    await expect(authorizeMcp(auth,null)).rejects.toThrow();
+  });
+});
+describe("Mailjet delivery",() => {
+  it("uses Send API v3.1 and fails without exposing provider bodies",async () => {
+    process.env.MAILJET_API_KEY="fake-public";
+    process.env.MAILJET_SECRET_KEY="fake-secret";
+    process.env.MAILJET_FROM_EMAIL="sender@example.com";
+    const fetchMock=vi.spyOn(globalThis,"fetch").mockResolvedValue(new Response(JSON.stringify({Messages:[{Status:"success"}]}),{status:200}));
+    await sendSignInCode("owner@example.com","123456");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.mailjet.com/v3.1/send");
+    const request=fetchMock.mock.calls[0][1]!;
+    expect(JSON.parse(String(request.body)).Messages[0].TextPart).toContain("123456");
+    fetchMock.mockResolvedValue(new Response("fake-secret 123456",{status:500}));
+    await expect(sendSignInCode("owner@example.com","123456")).rejects.toThrow("MAIL_DELIVERY_FAILED");
+  });
+});
