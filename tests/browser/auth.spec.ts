@@ -32,7 +32,11 @@ test("ChatGPT OAuth login continues to consent and registered callback",async({p
   await page.getByRole("button",{name:"Send code",exact:true}).click();
   const fixture=await (await request.get("http://127.0.0.1:3198/__qa/code")).json();
   await page.getByLabel("Sign-in code").fill(fixture.code);
+  const verified=page.waitForResponse(response=>response.url().includes("/sign-in/email-otp"));
   await page.getByRole("button",{name:"Verify code",exact:true}).click();
+  const verification=await verified;
+  const verificationBody=await verification.json();
+  expect(verification.status(),JSON.stringify({code:verificationBody.code,error:verificationBody.error,message:verificationBody.message})).toBe(200);
   await expect(page).toHaveURL(/\/consent\?/);
   await expect(page.getByRole("heading",{name:"Connect QA MCP"})).toBeVisible();
   await page.getByRole("button",{name:"Allow access",exact:true}).click();

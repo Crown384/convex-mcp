@@ -192,8 +192,8 @@ it("allows email login after ninety seconds and rejects expired signed OAuth req
   const client=await registration.json();
   const query=new URLSearchParams({client_id:client.client_id,redirect_uri:client.redirect_uris[0],response_type:"code",scope:"mcp:read",resource,code_challenge:"a".repeat(43),code_challenge_method:"S256"});
   const pending=await call("/oauth2/authorize?"+query);
-  const result=await pending.json();
-  const signedQuery=new URL(result.url,origin).searchParams.toString();
+  const pendingUrl=pending.headers.get("location")??(await pending.json()).url;
+  const signedQuery=new URL(pendingUrl,origin).searchParams.toString();
   await call("/email-otp/send-verification-otp",{email:"owner@example.com",type:"sign-in",oauth_query:signedQuery});
   const code=delivered;
   const now=Date.now();
