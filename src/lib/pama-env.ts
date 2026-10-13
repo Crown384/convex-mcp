@@ -11,7 +11,7 @@ export class SafeError extends Error {
 }
 
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const vars = ["CONVEX_URL", "CONVEX_DEPLOY_KEY"] as const;
+type SecretKey = "CONVEX_URL" | "CONVEX_DEPLOY_KEY";
 
 export function validSlug(value: unknown): value is string {
   return typeof value === "string" && value.length <= 64 && slugPattern.test(value);
@@ -92,7 +92,8 @@ export async function listProjects(): Promise<Project[]> {
     if (!row || typeof row !== "object" || !validSlug(row.slug) ||
         typeof row.name !== "string" || row.name.length > 100 ||
         !Array.isArray(row.environments) || !row.environments.every(validEnvironment)) throw new SafeError("UPSTREAM_FAILURE");
-    projects.push({ slug: row.slug, name: row.name, environments: [...new Set(row.environments)] });
+    const environments: Environment[] = (row.environments as unknown[]).filter(validEnvironment);
+    projects.push({ slug: row.slug, name: row.name, environments: [...new Set(environments)] });
   }
   return projects;
 }
@@ -108,7 +109,7 @@ export async function findDeployment(project: unknown, environment: unknown): Pr
   return { project, environment };
 }
 
-export async function machineVariable(deployment: Deployment, key: typeof vars[number]): Promise<string> {
+export async function machineVariable(deployment: Deployment, key: SecretKey): Promise<string> {
   const path = "/api/projects/" + deployment.project + "/env/" + deployment.environment + "/" + key;
   const payload = await machineGet(path);
   if (!payload || typeof payload !== "object" ||
