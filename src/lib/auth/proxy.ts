@@ -41,7 +41,7 @@ export async function proxyAuth(request:Request, path:string) {
       return Response.json({error:"FORBIDDEN"},{status:403,headers:noStoreHeaders});
     const url=new URL(request.url);
     const headers=new Headers();
-    for(const key of ["content-type","cookie","origin","authorization","user-agent"])
+    for(const key of ["content-type","cookie","origin","authorization","user-agent","accept","sec-fetch-mode"])
       {const value=request.headers.get(key);if(value)headers.set(key,value);}
     const response=await fetch(backendOrigin()+"/api/auth/"+path+url.search,{
       method:request.method,headers,redirect:"manual",cache:"no-store",signal:AbortSignal.timeout(15000),

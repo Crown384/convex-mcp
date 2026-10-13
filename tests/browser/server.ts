@@ -10,8 +10,8 @@ process.env.AUTH_SITE_URL="http://127.0.0.1:3199";
 process.env.CONVEX_AUTH_SITE_URL="http://127.0.0.1:3198";
 process.env.AUTH_ALLOWED_EMAILS="owner@example.com";
 process.env.BETTER_AUTH_SECRET="browser-fixture-only-not-a-real-runtime-secret";
-const options=authOptions(async()=>{});
-options.plugins[0].options.generateOTP=()=>"654321";
+let lastCode="";
+const options=authOptions(async (_email,otp)=>{lastCode=otp;});
 const db:Record<string,object[]>=Object.fromEntries(Object.keys(getAuthTables(options)).map(key=>[key,[]]));
 const auth=betterAuth({...options,database:memoryAdapter(db)});
 const backend=createServer(async(req,res)=>{
@@ -21,7 +21,7 @@ const backend=createServer(async(req,res)=>{
       method:req.method,headers:req.headers as Record<string,string>,
       ...(req.method==="POST"?{body:Buffer.concat(chunks)}:{}),
     });
-    const response=req.url==="/api/mcp/check"
+    const response=req.url==="/__qa/code"?Response.json({code:lastCode}):req.url==="/api/mcp/check"
       ?Response.json(await authorizeMcp(auth,request.headers.get("authorization")))
       :await auth.handler(request);
     res.statusCode=response.status;

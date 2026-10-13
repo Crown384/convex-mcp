@@ -1,12 +1,13 @@
 import { test,expect } from "@playwright/test";
 import { createHash } from "node:crypto";
-test("email-code login, session dashboard, and logout on phone viewport",async({page})=>{
+test("email-code login, session dashboard, and logout on phone viewport",async({page,request})=>{
   await page.route("**/api/owner",route=>route.fulfill({json:{projects:[]}}));
   await page.goto("/sign-in");
   await page.getByLabel("Email address").fill("owner@example.com");
   await page.getByRole("button",{name:"Send code",exact:true}).click();
   await expect(page.getByLabel("Sign-in code")).toBeFocused();
-  await page.getByLabel("Sign-in code").fill("654321");
+  const fixture=await (await request.get("http://127.0.0.1:3198/__qa/code")).json();
+  await page.getByLabel("Sign-in code").fill(fixture.code);
   await page.getByRole("button",{name:"Verify code",exact:true}).click();
   await expect(page).toHaveURL(/\/dashboard/);
   await expect(page.getByRole("heading",{name:"Managed projects"})).toBeVisible();
@@ -29,7 +30,8 @@ test("ChatGPT OAuth login continues to consent and registered callback",async({p
   await expect(page).toHaveURL(/\/sign-in\?/);
   await page.getByLabel("Email address").fill("owner@example.com");
   await page.getByRole("button",{name:"Send code",exact:true}).click();
-  await page.getByLabel("Sign-in code").fill("654321");
+  const fixture=await (await request.get("http://127.0.0.1:3198/__qa/code")).json();
+  await page.getByLabel("Sign-in code").fill(fixture.code);
   await page.getByRole("button",{name:"Verify code",exact:true}).click();
   await expect(page).toHaveURL(/\/consent\?/);
   await expect(page.getByRole("heading",{name:"Connect QA MCP"})).toBeVisible();
