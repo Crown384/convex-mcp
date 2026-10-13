@@ -56,7 +56,7 @@ The owner builds and maintains multiple Convex-backed products and may be away f
 
 ## 3. Current technology baseline and decisions
 
-**Observed starter (not yet production-ready):** root Next.js App Router project, React 19, Convex backend, Tailwind v4, TypeScript. Current `package.json` uses npm-oriented starter scripts and `vercel.json` runs a Convex deployment as part of building. No MCP implementation exists.
+**Current staging:** Next.js App Router, React 19, Tailwind v4, pinned pnpm, read-only MCP SDK endpoint and Better Auth email OTP/Mailjet OAuth. A local Convex component persists auth records; PamaENV remains the external registry and credential vault. Live deployment acceptance, operation audit, project grants and write approvals remain unfinished.
 
 **Preferred direction:**
 - Next.js App Router and a maintained, compatible MCP TypeScript SDK.

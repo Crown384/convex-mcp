@@ -1,32 +1,44 @@
 "use client";
-import { FormEvent, useState } from "react";
+import { useEffect, useState } from "react";
+import { authClient } from "@/src/lib/auth-client";
+import { useRouter } from "next/navigation";
 
 type Environment = "staging" | "production";
 type Project = { slug: string; name: string; environments: Environment[] };
 type Status = { project: string; environment: Environment; deployment: string; reachable: boolean };
 export default function Dashboard() {
-  // Deliberately kept only in tab memory: no cookie, localStorage or URL token.
-  const [token, setToken] = useState("");
-  const [connected, setConnected] = useState(false);
+  const router=useRouter();
+  const {data:session,isPending}=authClient.useSession();
+  const connected=Boolean(session);
+  const [grants,setGrants]=useState<{id:string;clientId:string}[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState("");
   const [checks, setChecks] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
 
-  async function connect(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true); setError(""); setConnected(false); setProjects([]);
-    try {
-      const response = await fetch("/api/owner", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
-      const data: { projects?: Project[]; error?: string } = await response.json();
-      if (!response.ok || !Array.isArray(data.projects)) throw new Error(data.error ?? "Connection failed");
-      setProjects(data.projects);
-      setConnected(true);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Connection failed"); }
-    finally { setBusy(false); }
+  useEffect(()=>{
+    if(!isPending&&!session){router.replace("/sign-in");return;}
+    if(!session)return;
+    let active=true;
+    setBusy(true);
+    void fetch("/api/owner",{cache:"no-store"}).then(async response=>{
+      if(response.status===401){router.replace("/sign-in");return;}
+      const data=await response.json();
+      if(!response.ok||!Array.isArray(data.projects))throw new Error();
+      if(active)setProjects(data.projects);
+    }).catch(()=>{if(active)setError("Unable to load your projects.");}).finally(()=>{if(active)setBusy(false);});
+    void authClient.oauth2.getConsents().then(result=>{
+      if(active&&result.data)setGrants(result.data.map(grant=>({id:grant.id,clientId:grant.clientId})));
+    });
+    return ()=>{active=false;};
+  },[session,isPending,router]);
+  async function revoke(id:string) {
+    setError("");
+    const response=await authClient.oauth2.deleteConsent({id});
+    if(response.error){setError("Unable to revoke this connection.");return;}
+    setGrants(previous=>previous.filter(grant=>grant.id!==id));
   }
-
   async function check(project: string, environment: Environment) {
     const key = project + ":" + environment;
     setChecking(key);
@@ -34,7 +46,7 @@ export default function Dashboard() {
     try {
       const response = await fetch("/api/owner", {
         method: "POST", cache: "no-store",
-        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project, environment }),
       });
       const data: Status & { error?: string } = await response.json();
@@ -44,8 +56,11 @@ export default function Dashboard() {
     finally { setChecking(""); }
   }
 
-  function disconnect() {
-    setToken(""); setConnected(false); setProjects([]); setChecks({}); setError("");
+  async function disconnect() {
+    const response=await authClient.signOut();
+    if(response.error){setError("Unable to sign out. Try again.");return;}
+    setProjects([]);setChecks({});setGrants([]);
+    router.replace("/sign-in");router.refresh();
   }
 
   return (
@@ -57,20 +72,10 @@ export default function Dashboard() {
             <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Convex control plane</h1>
             <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">View the deployments authorized by PamaENV. No deploy key is sent to your browser or the MCP client.</p>
           </div>
-          {connected && <button type="button" onClick={disconnect} className="shrink-0 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100">Disconnect</button>}
+          {connected && <button type="button" onClick={disconnect} className="shrink-0 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-100">Sign out</button>}
         </header>
-        {!connected ? (
-          <section className="max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-            <h2 className="text-lg font-semibold">Owner access</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">Enter the personal control-plane access token configured on the server. It stays in memory and is cleared when this tab closes.</p>
-            <form onSubmit={connect} className="mt-6 space-y-4">
-              <label htmlFor="access-token" className="block text-sm font-semibold">Access token</label>
-              <input id="access-token" type="password" autoComplete="off" spellCheck={false} required minLength={32} value={token} onChange={event => setToken(event.target.value)} placeholder="Paste your server access token" className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-500" />
-              {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-              <button type="submit" disabled={busy || token.length < 32} className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{busy ? "Connecting..." : "Open dashboard"}</button>
-            </form>
-          </section>
-        ) : (
+        {error&&<p role="alert" className="mb-5 text-sm text-red-700">{error}</p>}
+        {!connected||busy ? <p role="status" className="text-sm text-slate-600">Loading your dashboard…</p> : (
           <section aria-live="polite" className="space-y-4">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-lg font-semibold">Managed projects</h2>
@@ -95,8 +100,16 @@ export default function Dashboard() {
             </article>)}
           </section>
         )}
+        {connected&&<section className="mt-8 rounded-2xl border border-slate-200 bg-white p-5">
+          <h2 className="font-semibold">Connected MCP clients</h2>
+          {grants.length===0&&<p className="mt-3 text-sm text-slate-600">No clients connected.</p>}
+          {grants.map(grant=><div key={grant.id} className="mt-4 flex items-center justify-between gap-3">
+            <span className="min-w-0 break-all text-xs text-slate-600">{grant.clientId}</span>
+            <button onClick={()=>void revoke(grant.id)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium">Revoke</button>
+          </div>)}
+        </section>}
         <footer className="mt-10 border-t border-slate-200 py-6 text-xs leading-6 text-slate-500">
-          Personal-use read-only MVP. No arbitrary queries, database mutation, environment values, or production writes are exposed. MCP clients must supply the same configured bearer token; OAuth is not yet implemented.
+          Personal-use read-only MVP. No arbitrary queries, database mutation, environment values, or production writes are exposed. MCP clients connect through email sign-in and OAuth approval. Sign out or revoke a connection to stop its access.
         </footer>
       </div>
     </main>

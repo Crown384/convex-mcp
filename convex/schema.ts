@@ -1,5 +1,13 @@
-import { defineSchema } from "convex/server";
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
 
-// Phase 0 contains no public application functions or application tables.
-// Phase 1 adds only authenticated, workspace-scoped control-plane records.
-export default defineSchema({});
+export default defineSchema({
+  authGuards: defineTable({
+    key: v.string(),
+    leaseToken: v.optional(v.string()),
+    leaseUntil: v.number(),
+    windowStart: v.number(),
+    sends: v.number(),
+    attempts: v.number(),
+  }).index("by_key", ["key"]),
+});

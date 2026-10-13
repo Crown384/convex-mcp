@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Pama Convex MCP | Control plane foundation",
-  description: "Security-first foundation for a multi-project Convex control plane. Not yet connected to managed deployments.",
+  title: "Pama Convex MCP",
+  description: "Sign in and manage your authorized Convex deployments.",
   robots: { index: false, follow: false },
 };
 
