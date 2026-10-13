@@ -1,153 +1,34 @@
-Validated source: f72650ddb0d76af220c743a40c6f52ae4b2e4874
-Environment: disposable Daytona sandbox; dummy auth identities and mail transport; no live secrets or account deployment.
+Authentication staging validation — normalized execution evidence
+UTC date: 2026-10-13
+Repository: Crown384/convex-mcp
+Source tested: 5e7b54986b341b39c8a0c1a563b986371d02db03
+Target base: staging / 50405adb00564a38839c429cbc1824868f9fdad9
+Runner: Daytona sandbox 2b58fc6e-15b7-49c5-a536-4ded64be11e4
+Checkout: git fetch origin feat/better-auth-mailjet-mcp-oauth; git checkout --detach FETCH_HEAD
+Node: v25.9.0; pnpm: 10.18.3
 
-Daytona cycle: Crown384/convex-mcp @ staging
-Checked out: 235763bd6c1fee1e02fe90ae5f7ef923d2269551
+Executed with a gate runner that preserves any nonzero command status:
+corepack pnpm install --frozen-lockfile — exit 0
+corepack pnpm lint — exit 0
+corepack pnpm typecheck — exit 0
+corepack pnpm test — exit 0
+  Node tests: 30 passed, 0 failed.
+  Vitest: 25 passed, 0 failed (16 auth, 6 real Convex adapter, 3 MCP HTTP).
+corepack pnpm build — exit 0, Next.js 15.5.27 production build completed.
+corepack pnpm exec playwright test — exit 0, 2 passed:
+  Email-code login, session dashboard and logout at 390x844 viewport.
+  OAuth login continues to consent and registered ChatGPT callback.
+Overall cycle: exit 0. Working tree: clean.
 
-== custom command ==
-path=.
-command=git fetch origin feat/better-auth-mailjet-mcp-oauth
-git checkout --detach FETCH_HEAD
-node -e 'const {spawnSync}=require("child_process");let failed=false;for(const args of [["pnpm","install","--frozen-lockfile"],["pnpm","lint"],["pnpm","typecheck"],["pnpm","test"],["pnpm","build"],["pnpm","exec","playwright","test"]]){const r=spawnSync("corepack",args,{stdio:"inherit"});console.log("GATE "+args.join(" ")+": "+r.status);if(r.status!==0)failed=true;}process.exit(failed?1:0)'
-From https://github.com/Crown384/convex-mcp
- * branch            feat/better-auth-mailjet-mcp-oauth -> FETCH_HEAD
-Previous HEAD position was 235763b test: wait for OTP delivery before entering browser fixture code
-HEAD is now at f72650d docs: document Better Auth Mailjet setup and staging acceptance
-Lockfile is up to date, resolution step is skipped
-Already up to date
+Regression evidence:
+bc4016a: real Convex concurrent OTP submissions all succeeded; resend code reused. Tests failed.
+55cacaa: both OTP regressions passed; new real Convex refresh test failed500.
+af0fb14: two refresh rotations and old-token replay passed; typecheck failedgenericconstraint.
+01f29bb: adapter typecheck passed; delivery failure/lease cleanup passed. A repeated mock Response body was corrected in final test commit.
+5e7b549: every gate above passed; alternate paths denied, attempts and send/registration budgets enforced, delivery failure safely surfaced.
 
-╭ Warning ─────────────────────────────────────────────────────────────────────╮
-│                                                                              │
-│   Ignored build scripts: esbuild, unrs-resolver.                             │
-│   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
-│   to run scripts.                                                            │
-│                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯
-
-Done in 617ms using pnpm v10.18.3
-GATE pnpm install --frozen-lockfile: 0
-
-> @pama/convex-mcp@0.1.0 lint /home/daytona/workspace/repo
-> eslint .
-
-GATE pnpm lint: 0
-
-> @pama/convex-mcp@0.1.0 typecheck /home/daytona/workspace/repo
-> tsc --noEmit
-
-GATE pnpm typecheck: 0
-
-> @pama/convex-mcp@0.1.0 test /home/daytona/workspace/repo
-> node --test tests/*.test.cjs && vitest run
-
-✔ table discovery includes schema-less tables without exposing document shapes (17.121621ms)
-✔ usage-limit projection never returns unauthorized upstream fields (1.642481ms)
-✔ Convex query authorization failure is not mistaken for an empty table list (1.316599ms)
-✔ function metadata excludes arbitrary upstream fields and never executes functions (1.087272ms)
-✔ documents reject unauthorized projects/tables and disabled policy before fetching secrets (0.518053ms)
-✔ document list paginates and projects only specifically permitted user fields (1.192592ms)
-✔ invalid document policy and out-of-range limits fail closed (0.492554ms)
-✔ malformed page and oversized projected values fail closed (1.703823ms)
-✔ document projection rejects nested objects instead of leaking nested personal data (0.698696ms)
-✔ logs metadata strips raw secrets, messages and error stack while filtering (1.41025ms)
-✔ log reads deny production before secrets and reject invalid pagination (0.17852ms)
-✔ logs fail closed for upstream malformed entries (0.52286ms)
-✔ credentials are not authorization and bearer token is timing-safe equality (1.195816ms)
-✔ fail-closed when the machine secret is not configured (0.952699ms)
-✔ regional Convex deployment hosts match exactly and spoofing is rejected (0.586315ms)
-✔ URL cannot route deployment operations to attacker-controlled host (0.381195ms)
-✔ read-only MCP discovers delegated projects and never reveals secrets (13.621603ms)
-✔ stale or revoked PamaENV machine token cannot access a deployment (0.351811ms)
-✔ production metadata is denied before any deploy key is fetched (0.516219ms)
-✔ deployment API verifies host and never returns deploy key (1.188215ms)
-✔ environment names are strictly redacted and production names always denied (1.209668ms)
-✔ MCP dispatch implements initialization, list, error hygiene, and notification acknowledgement (0.392623ms)
-✔ production main is eligible for building (0.641579ms)
-✔ refuses build for environment preview and branch feat/phase-0-foundation (0.107442ms)
-✔ refuses build for environment preview and branch staging (0.065449ms)
-✔ refuses build for environment production and branch staging (0.075083ms)
-✔ refuses build for environment production and branch feat/mcp (0.069546ms)
-✔ refuses build for environment undefined and branch undefined (0.053921ms)
-✔ refuses build for environment production and branch undefined (0.06002ms)
-✔ refuses build for environment undefined and branch main (0.076836ms)
-ℹ tests 30
-ℹ suites 0
-ℹ pass 30
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 799.305296
-(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
-  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
-Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
-
-[1m[46m RUN [49m[22m [36mv4.1.0 [39m[90m/home/daytona/workspace/repo[39m
-
- [32m✓[39m tests/convex-auth.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 650[2mms[22m[39m
-   [33m[2m✓[22m[39m persists email-code login in the real local Convex auth component [33m 649[2mms[22m[39m
- [32m✓[39m tests/authentication.test.ts [2m([22m[2m16 tests[22m[2m)[22m[33m 1038[2mms[22m[39m
- [32m✓[39m tests/mcp-http.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 41[2mms[22m[39m
-
-[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
-[2m      Tests [22m [1m[32m20 passed[39m[22m[90m (20)[39m
-[2m   Start at [22m 21:09:57
-[2m   Duration [22m 2.55s[2m (transform 123ms, setup 0ms, import 542ms, tests 1.73s, environment 0ms)[22m
-
-GATE pnpm test: 0
-
-> @pama/convex-mcp@0.1.0 build /home/daytona/workspace/repo
-> next build
-
-   ▲ Next.js 15.5.27
-
-   Creating an optimized production build ...
- ✓ Compiled successfully in 6.9s
-   Linting and checking validity of types ...
-   Collecting page data ...
-   Generating static pages (0/8) ...
-   Generating static pages (2/8) 
-   Generating static pages (4/8) 
-   Generating static pages (6/8) 
- ✓ Generating static pages (8/8)
-   Finalizing page optimization ...
-   Collecting build traces ...
-
-Route (app)                                              Size  First Load JS
-┌ ○ /                                                 3.44 kB         106 kB
-├ ○ /_not-found                                         989 B         103 kB
-├ ƒ /.well-known/oauth-authorization-server             142 B         102 kB
-├ ƒ /.well-known/oauth-authorization-server/api/auth    142 B         102 kB
-├ ƒ /.well-known/oauth-protected-resource               142 B         102 kB
-├ ƒ /.well-known/oauth-protected-resource/api/mcp       142 B         102 kB
-├ ƒ /api/auth/[...all]                                  142 B         102 kB
-├ ƒ /api/health                                         142 B         102 kB
-├ ƒ /api/mcp                                            142 B         102 kB
-├ ƒ /api/owner                                          142 B         102 kB
-├ ○ /consent                                          1.36 kB         115 kB
-├ ○ /dashboard                                        2.18 kB         116 kB
-└ ○ /sign-in                                          1.66 kB         116 kB
-+ First Load JS shared by all                          102 kB
-  ├ chunks/751-a1ea9e247ac665a4.js                      46 kB
-  ├ chunks/ecb18524-bf8434f0f80d6c40.js               54.2 kB
-  └ other shared chunks (total)                       1.93 kB
-
-
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
-
-GATE pnpm build: 0
-
-Running 2 tests using 1 worker
-
-  ✓  1 tests/browser/auth.spec.ts:3:5 › email-code login, session dashboard, and logout on phone viewport (3.9s)
-  ✓  2 tests/browser/auth.spec.ts:17:5 › ChatGPT OAuth login continues to consent and registered callback (2.8s)
-
-  2 passed (15.6s)
-GATE pnpm exec playwright test: 0
-
-== git status ==
-clean
-
-== cycle result ==
-exit_code=0
+This file records observed results; it is not the complete raw command transcript.
+Mailjet responses and managed deployment responses are fixtures. Browser auth uses a memory adapter;
+the Convex test independently exercises the actual local component adapter.
+Real hosting, Mailjet delivery, PamaENV access and ChatGPT account attachment were not executed.
+A later documentation/evidence-only commit changes no tested implementation/configuration.

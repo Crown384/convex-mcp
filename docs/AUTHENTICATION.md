@@ -2,7 +2,7 @@
 
 ## Private configuration
 
-Deploy the control plane to its own nonproduction Convex deployment. It must be separate from all managed Convex projects. The local betterAuth component expands the provider schema; the root application schema stays empty.
+Deploy the control plane to its own nonproduction Convex deployment. It must be separate from all managed Convex projects. The local betterAuth component expands the provider schema; the root schema holds only internal transactional auth guards, keyed by a secret-derived email hash. It exposes no public application functions.
 
 On the Next.js host set:
 - AUTH_SITE_URL: exact HTTPS website origin, no path/query/fragment.
@@ -28,9 +28,11 @@ Local development may use loopback HTTP in development only. Production rejects 
    - /.well-known/oauth-protected-resource/api/mcp (also root alias)
    - /.well-known/oauth-authorization-server/api/auth (also root alias)
    - /api/auth/.well-known/oauth-authorization-server
-5. The OAuth provider exposes /api/auth/oauth2/register, /authorize, /token and /api/auth/jwks. Unauthenticated registration creates public clients only and does not grant access. Registration is rate-limited; unknown scopes and insecure PKCE are rejected by the provider.
+5. The OAuth provider exposes /api/auth/oauth2/register, /authorize, /token and /api/auth/jwks. Unauthenticated registration creates public clients only and does not grant access. Registration is capped atomically at five requests per minute across the backend; unknown scopes and insecure PKCE are rejected by the provider.
 6. Complete email-code login, review client consent, and allow access. The signed OAuth request lasts ten minutes so the five-minute email code flow has time to finish. Authorization codes are one-use, PKCE-bound, and expire.
-7. Tokens require mcp:read, the exact MCP resource, issuer, signature, expiry and a current owner/session/client/consent record. Access tokens last five minutes; refresh tokens rotate and have a maximum seven-day lifetime. MCP access ends when the authorizing six-hour browser session expires, is signed out, or consent is revoked.
+7. Tokens require mcp:read, the exact MCP resource, issuer, signature, expiry and a current owner/session/client/consent record. Access tokens last five minutes; refresh tokens rotate and have a maximum seven-day lifetime. Email send/verify operations share a transaction-backed per-owner lease. There are at most three sends per minute and three code attempts per challenge, independent of client IP. Resending deletes all previous sign-in challenges; a failed Mailjet delivery invalidates its challenge and returns a safe error. Delivery has a ten-second timeout. Normal completion releases its fenced lease; an interrupted action can leave that owner locked for up to 35 minutes.
+
+MCP access ends when the authorizing six-hour browser session expires, is signed out, or consent is revoked.
 
 The Next server fetch hop is a cors request even when the browser is navigating. The facade restores a navigation redirect only for a validated authorize response from the fixed backend, never from a caller-provided URL.
 
