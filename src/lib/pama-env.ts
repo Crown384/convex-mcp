@@ -40,7 +40,7 @@ function machineToken(): string {
 }
 
 /** Limits upstream body size even if content-length is missing or forged. */
-async function boundedJson(response: Response): Promise<unknown> {
+export async function boundedJson(response: Response, maxBytes = 64_000): Promise<unknown> {
   const reader = response.body?.getReader();
   if (!reader) throw new SafeError("UPSTREAM_FAILURE");
   const chunks: Uint8Array[] = [];
@@ -50,7 +50,7 @@ async function boundedJson(response: Response): Promise<unknown> {
       const { done, value } = await reader.read();
       if (done) break;
       length += value.byteLength;
-      if (length > 64_000) throw new SafeError("UPSTREAM_FAILURE");
+      if (length > maxBytes) throw new SafeError("UPSTREAM_FAILURE");
       chunks.push(value);
     }
   } finally {
@@ -125,10 +125,10 @@ export function validateConvexTarget(url: string, key: string, environment: Envi
   try { parsed = new URL(url); } catch { throw new SafeError("CREDENTIAL_MISMATCH"); }
   if (parsed.protocol !== "https:" || parsed.username || parsed.password ||
       parsed.port || parsed.pathname !== "/" || parsed.search || parsed.hash ||
-      !/^[a-z0-9-]+\.convex\.cloud$/.test(parsed.hostname)) throw new SafeError("CREDENTIAL_MISMATCH");
+      !/^[a-z0-9-]+(?:\.(?:eu-west-1|ca-central-1|ap-southeast-2|us-east-1))?\.convex\.cloud$/.test(parsed.hostname)) throw new SafeError("CREDENTIAL_MISMATCH");
   const match = /^(dev|prod):([a-z0-9-]+)\|([^\s]{16,})$/.exec(key);
   if (!match || (environment === "production" && match[1] !== "prod") ||
-      parsed.hostname !== match[2] + ".convex.cloud") throw new SafeError("CREDENTIAL_MISMATCH");
+      !parsed.hostname.startsWith(match[2] + ".")) throw new SafeError("CREDENTIAL_MISMATCH");
   return parsed;
 }
 
@@ -148,7 +148,7 @@ export async function withDeploymentCredential<T>(
 
 /** Admin Deployment API, never the public user-authenticated Functions API. */
 export async function convexGet(url: URL, key: string, path: string): Promise<unknown> {
-  if (path !== "/api/v1/deployment_info" && path !== "/api/v1/list_environment_variables")
+  if (!["/api/v1/deployment_info", "/api/v1/list_environment_variables", "/api/v1/list_usage_limits"].includes(path))
     throw new SafeError("CAPABILITY_UNAVAILABLE");
   try {
     const response = await fetch(url.origin + path, {

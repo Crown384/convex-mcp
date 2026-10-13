@@ -6,7 +6,7 @@ This milestone uses the PamaENV machine API as the project registry and secret v
 
 In PamaENV create a separate machine client authorized only for required projects/environments. Revoke it there to stop access at the vault. Configure PAMA_ENV_STORE_URL as the exact HTTPS origin of PamaENV and PAMA_ENV_MACHINE_TOKEN as this client's pes_ token on the Convex MCP server. Set a separate random MCP_ACCESS_TOKEN (at least 32 characters). Store these in private Vercel server variables or equivalent secret manager, never in NEXT_PUBLIC_* or Git history. Run a fresh server deployment for rotations. No secret should be pasted into an AI prompt.
 
-Staging can use a dev deployment key or a production deploy key for a physically separate Convex staging project. Production requires a prod: deploy key targeting the exact Convex hostname. The hostname on CONVEX_URL must match the deployment name embedded in the key, and the URL must be HTTPS on the convex.cloud domain. Self-hosted Convex is intentionally not supported in this milestone. Only the configured, fixed PamaENV origin is contacted for credentials. Unsupported permissions and upstream errors return safe codes.
+Staging can use a dev deployment key or a production deploy key for a physically separate Convex staging project. Regional Convex hosts (such as name.eu-west-1.convex.cloud) are recognized. Production requires a prod: deploy key targeting the exact Convex hostname. The hostname on CONVEX_URL must match the deployment name embedded in the key, and the URL must be HTTPS on the convex.cloud domain. Self-hosted Convex is intentionally not supported in this milestone. Only the configured, fixed PamaENV origin is contacted for credentials. Unsupported permissions and upstream errors return safe codes.
 
 By default production connection checks are denied. Set MCP_ENABLE_PRODUCTION_READS=true to enable the safe production status tool, NOT writes or PII tools. The staging environment_names_list tool returns names only; no environment values ever leave the server.
 
@@ -23,7 +23,7 @@ Accept: application/json, text/event-stream
 
 Stateless JSON-RPC Streamable HTTP subset: initialize, notifications/initialized, ping, tools/list, tools/call. GET returns 405; there is no server-initiated streaming or session state. The MCP client must support supplying its bearer header; this is NOT yet OAuth-compatible with clients that require OAuth discovery. Do not claim working ChatGPT connection until real remote client authentication is implemented and tested.
 
-Available tools: projects_list, deployments_list, deployment_status, environment_names_list. No arbitrary queries, run, deletes, mutations, environment values or unmanaged hosts.
+Available tools: projects_list, deployments_list, deployment_status, environment_names_list, tables_list, functions_list, usage_limits_list. New tools return bounded metadata only, not document values, environment secrets, or function execution. No arbitrary queries, run, deletes, mutations, environment values or unmanaged hosts.
 
 Example initialization:
 

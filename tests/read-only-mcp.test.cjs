@@ -45,6 +45,19 @@ test("fail-closed when the machine secret is not configured", async () => {
   delete process.env.PAMA_ENV_MACHINE_TOKEN;
   await assert.rejects(lib.listProjects(), { code: "NOT_CONFIGURED" });
 });
+test("regional Convex deployment hosts match exactly and spoofing is rejected",()=>{
+  setup();
+  const key="dev:happy-capybara-123|"+"a".repeat(32);
+  for(const region of ["eu-west-1","ca-central-1","ap-southeast-2","us-east-1"]){
+    const url="https://happy-capybara-123."+region+".convex.cloud";
+    assert.equal(lib.validateConvexTarget(url,key,"staging").origin,url);
+  }
+  for(const url of ["https://other-happy-capybara-123.convex.cloud",
+    "https://happy-capybara-123.evil.convex.cloud",
+    "https://happy-capybara-123.eu-west-1.convex.cloud.evil.com"]){
+    assert.throws(()=>lib.validateConvexTarget(url,key,"staging"),{code:"CREDENTIAL_MISMATCH"});
+  }
+});
 test("URL cannot route deployment operations to attacker-controlled host", () => {
   setup();
   assert.equal(lib.validateConvexTarget("https://happy-capybara-123.convex.cloud", "dev:happy-capybara-123|" + "a".repeat(32), "staging").hostname, "happy-capybara-123.convex.cloud");
@@ -119,7 +132,7 @@ test("MCP dispatch implements initialization, list, error hygiene, and notificat
   const init = await mcp.dispatchMcp({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
   assert.equal(init.body.result.protocolVersion, "2025-06-18");
   const list = await mcp.dispatchMcp({ jsonrpc: "2.0", id: 2, method: "tools/list" });
-  assert.equal(list.body.result.tools.length, 4);
+  assert.equal(list.body.result.tools.length, 7);
   const denied = await mcp.dispatchMcp({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "unknown", arguments: {} } });
   assert.equal(denied.body.result.isError, true);
   assert.equal(denied.body.result.content[0].text, '{"error":"UNKNOWN_TOOL"}');
