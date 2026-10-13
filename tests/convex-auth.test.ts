@@ -84,7 +84,8 @@ it("allows only one concurrent use of a valid email code",async()=>{
   const responses=await Promise.all([verify(),verify(),verify()]);
   expect(responses.filter(response=>response.status===200)).toHaveLength(1);
 });
-it("limits OTP requests even when no client IP header exists",async()=>{
+it("limits OTP requests in production even when no client IP header exists",async()=>{
+  process.env={...process.env,NODE_ENV:"production"};
   const t=convexTest(schema,import.meta.glob("../convex/**/*.ts"));
   t.registerComponent("betterAuth",authSchema,{...import.meta.glob("../convex/betterAuth/**/*.ts"),
     "../convex/betterAuth/_generated/server.ts":()=>import("../convex/_generated/server")});
@@ -97,4 +98,22 @@ it("limits OTP requests even when no client IP header exists",async()=>{
     statuses.push(response.status);
   }
   expect(statuses).toEqual([200,200,200,429]);
+});
+
+it("rotates resends without leaving the latest code reusable",async()=>{
+  const t=convexTest(schema,import.meta.glob("../convex/**/*.ts"));
+  t.registerComponent("betterAuth",authSchema,{...import.meta.glob("../convex/betterAuth/**/*.ts"),
+    "../convex/betterAuth/_generated/server.ts":()=>import("../convex/_generated/server")});
+  let otp="";
+  vi.spyOn(globalThis,"fetch").mockImplementation(async(_url,options)=>{
+    otp=JSON.parse(String(options?.body)).Messages[0].TextPart.match(/is (\d{6})/)[1];
+    return Response.json({Messages:[{Status:"success"}]});
+  });
+  const headers={"content-type":"application/json",origin:"https://mcp.example.com"};
+  const send=()=>t.fetch("/api/auth/email-otp/send-verification-otp",{method:"POST",headers,body:JSON.stringify({email:"owner@example.com",type:"sign-in"})});
+  const verify=()=>t.fetch("/api/auth/sign-in/email-otp",{method:"POST",headers,body:JSON.stringify({email:"owner@example.com",otp})});
+  await send();await verify();
+  await send();await send();
+  expect((await verify()).status).toBe(200);
+  expect((await verify()).status).not.toBe(200);
 });
