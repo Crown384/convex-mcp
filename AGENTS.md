@@ -2,7 +2,7 @@
 
 > Standing operating instructions for every AI coding agent and human contributor working in this repository.
 > **Read this file and [PROJECT_SPEC.md](./PROJECT_SPEC.md) in full before editing code.** If the documents disagree, choose the more restrictive security requirement and request clarification.
-> Updated: 2026-10-10. Status: **planning/bootstrap**, NOT an implemented MCP server.
+> Updated: 2026-10-13. Status: **read-only staging implementation with Better Auth/Mailjet OAuth**, pending live deployment acceptance.
 
 ## 1. Mission and scope
 
@@ -19,15 +19,9 @@ Do not confuse this product with:
 
 ## 2. Current repository reality — inspect again before coding
 
-At the time of writing, `Crown384/convex-mcp` is effectively the **get-convex/template-nextjs starter**:
-- Root `app/`, `components/`, `convex/`; `convex/schema.ts` contains a sample `numbers` table.
-- Next.js 15.2.3, React 19, Convex ^1.23, Tailwind CSS 4, TypeScript.
-- Existing starter `README.md`, `package.json`, `vercel.json` (`npx convex deploy --cmd 'npm run build'`).
-- Default branch `main`; no `staging` branch was found at documentation time.
-- No implemented MCP endpoint, multi-project registry, production credential vault, or authenticated admin dashboard.
-- Package scripts come from the starter; verify/repair them as part of bootstrap (for example, `next lint` may no longer be appropriate). Do not report tests as passed without executing them.
+Current staging contains a Next.js dashboard, nine read-only tools, official SDK transport, Better Auth email-code login and OAuth using a local Convex component. PamaENV is the delegated project registry and external secret store. No managed-project credentials are duplicated in the auth database.
 
-**No app features described in the spec currently exist merely because they appear in these documents.** Inspect the repository and GitHub issues/PRs before every phase; update documentation when implementation changes.
+See README.md and docs/AUTHENTICATION.md for the current runtime/setup. Existing docs may include planned features; inspect source and evidence before claiming live connectivity, write approvals or production readiness.
 
 ## 3. Non-negotiable security rules
 
