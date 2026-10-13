@@ -132,3 +132,40 @@ it("rotates resends without leaving the latest code reusable",async()=>{
   expect((await verify()).status).toBe(200);
   expect((await verify()).status).not.toBe(200);
 });
+
+it("rejects alternate endpoint paths and limits wrong codes independently of IP",async()=>{
+  const t=convexTest(schema,import.meta.glob("../convex/**/*.ts"));
+  t.registerComponent("betterAuth",authSchema,{...import.meta.glob("../convex/betterAuth/**/*.ts"),
+    "../convex/betterAuth/_generated/server.ts":()=>import("../convex/_generated/server")});
+  let otp="";
+  vi.spyOn(globalThis,"fetch").mockImplementation(async(_url,options)=>{
+    otp=JSON.parse(String(options?.body)).Messages[0].TextPart.match(/is (\d{6})/)[1];
+    return Response.json({Messages:[{Status:"success"}]});
+  });
+  const headers={"content-type":"application/json",origin:"https://mcp.example.com"};
+  await t.fetch("/api/auth/email-otp/send-verification-otp",{method:"POST",headers,body:JSON.stringify({email:"owner@example.com",type:"sign-in"})});
+  for(const path of ["sign-in/email-otp//","/sign-in/email-otp","sign-in/%65mail-otp","email-otp/create-verification-otp"]){
+    const response=await t.fetch("/api/auth/"+path,{method:"POST",headers,body:JSON.stringify({email:"owner@example.com",otp})});
+    expect(response.status).toBe(404);
+  }
+  const wrong=otp==="000000"?"000001":"000000";
+  const verify=(value:string)=>t.fetch("/api/auth/sign-in/email-otp",{method:"POST",headers,body:JSON.stringify({email:"owner@example.com",otp:value})});
+  for(let i=0;i<3;i++)expect((await verify(wrong)).status).not.toBe(200);
+  expect((await verify(otp)).status).toBe(429);
+});
+it("releases a failed delivery lease and atomically budgets public registrations",async()=>{
+  const t=convexTest(schema,import.meta.glob("../convex/**/*.ts"));
+  t.registerComponent("betterAuth",authSchema,{...import.meta.glob("../convex/betterAuth/**/*.ts"),
+    "../convex/betterAuth/_generated/server.ts":()=>import("../convex/_generated/server")});
+  const mail=vi.spyOn(globalThis,"fetch").mockRejectedValueOnce(new Error("provider unavailable"))
+    .mockResolvedValue(Response.json({Messages:[{Status:"success"}]}));
+  const headers={"content-type":"application/json",origin:"https://mcp.example.com"};
+  const send=()=>t.fetch("/api/auth/email-otp/send-verification-otp",{method:"POST",headers,body:JSON.stringify({email:"owner@example.com",type:"sign-in"})});
+  expect((await send()).status).not.toBe(200);
+  expect((await send()).status).toBe(200);
+  expect(mail).toHaveBeenCalledTimes(2);
+  for(let i=0;i<5;i++)expect((await t.fetch("/api/auth/oauth2/register",{method:"POST",headers,body:JSON.stringify({
+    client_name:"QA",redirect_uris:["https://chatgpt.com/connector_platform/oauth/callback"],token_endpoint_auth_method:"none",scope:"mcp:read"
+  })})).status).toBe(200);
+  expect((await t.fetch("/api/auth/oauth2/register",{method:"POST",headers,body:"{}"})).status).toBe(429);
+});

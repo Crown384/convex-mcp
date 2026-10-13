@@ -15,7 +15,7 @@ export const beginAuth = internalMutation({
     const attempts = row?.attempts ?? 0;
     if (kind === "verify" ? attempts >= 3 : sends >= (kind === "register" ? 5 : 3)) return false;
     const value = {
-      key, leaseToken: token, leaseUntil: now + 15 * 60_000, windowStart,
+      key, leaseToken: token, leaseUntil: now + 35 * 60_000, windowStart,
       sends: sends + (kind === "verify" ? 0 : 1),
       attempts: attempts + (kind === "verify" ? 1 : 0),
     };

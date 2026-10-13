@@ -1,4 +1,4 @@
-import { AuthFailure, ownerEmail, siteOrigin } from "./settings";
+import { AUTH_ENDPOINTS, AuthFailure, ownerEmail, siteOrigin } from "./settings";
 import { noStoreHeaders } from "../http-headers";
 
 export function backendOrigin() {
@@ -29,9 +29,7 @@ export async function boundedBody(request:Request, maximum:number) {
 export function sameOrigin(request:Request) {
   return request.headers.get("origin")===siteOrigin();
 }
-const exposed = new Set(["get-session","sign-out","sign-in/email-otp","email-otp/send-verification-otp",
-  "oauth2/authorize","oauth2/consent","oauth2/token","oauth2/register","oauth2/public-client",
-  "oauth2/get-consents","oauth2/delete-consent","jwks",".well-known/oauth-authorization-server",".well-known/openid-configuration"]);
+const exposed = AUTH_ENDPOINTS;
 const browserPosts = new Set(["sign-out","sign-in/email-otp","email-otp/send-verification-otp","oauth2/consent","oauth2/delete-consent"]);
 
 export async function proxyAuth(request:Request, path:string) {

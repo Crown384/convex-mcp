@@ -9,7 +9,7 @@ export function createAuthOptions(ctx: GenericCtx<DataModel>) {
   const factory = authComponent.adapter(ctx);
   return { ...authOptions(), database: (options: Parameters<typeof factory>[0]) => {
     const adapter = factory(options);
-    return { ...adapter, create: async <T>(input: Parameters<typeof adapter.create<T>>[0]) => {
+    return { ...adapter, create: async <T extends Record<string, unknown>>(input: Parameters<typeof adapter.create<T>>[0]) => {
       // OAuth rotation uses a CAS predicate revoked=null. Convex distinguishes
       // an absent optional field from null, so persist that initial state explicitly.
       if (input.model === "oauthRefreshToken") {

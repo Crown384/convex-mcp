@@ -2,7 +2,7 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { createAuth } from "./auth";
-import { ownerEmail } from "../src/lib/auth/settings";
+import { AUTH_ENDPOINTS, ownerEmail } from "../src/lib/auth/settings";
 import { authorizeMcp } from "../src/lib/auth/authorize";
 import { noStoreHeaders } from "../src/lib/http-headers";
 
@@ -11,7 +11,10 @@ const authHandler = httpAction(async (ctx, request) => {
   let guard: { key: string; token: string } | undefined;
   let resetAttempts = false;
   try {
-    const path = new URL(request.url).pathname.replace(/\/$/, "");
+    const rawPath = new URL(request.url).pathname;
+    const path = rawPath.replace(/\/+$/, "");
+    if (rawPath !== path || !AUTH_ENDPOINTS.has(path.slice("/api/auth/".length)))
+      return Response.json({ error: "NOT_FOUND" }, { status: 404, headers: noStoreHeaders });
     const kind = request.method !== "POST" ? undefined
       : path === "/api/auth/email-otp/send-verification-otp" ? "send"
       : path === "/api/auth/sign-in/email-otp" ? "verify"
