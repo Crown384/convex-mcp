@@ -1,5 +1,5 @@
 import { getDeploymentStatus, getEnvironmentNames, listProjects, SafeError, validEnvironment, validSlug } from "./pama-env";
-import { listTables, listFunctions, listUsageLimits } from "./convex-inspect";
+import { listTables, listFunctions, listUsageLimits, listDocuments } from "./convex-inspect";
 
 export const toolDefinitions = [
   {
@@ -34,6 +34,16 @@ export const toolDefinitions = [
     description: "Read existing usage-limit settings; never changes them.",
     inputSchema: { type: "object", properties: { project: { type: "string" }, environment: { type: "string", enum: ["staging", "production"] } }, required: ["project", "environment"], additionalProperties: false },
     annotations: { readOnlyHint: true },
+  },
+  {
+    name: "documents_list",
+    description: "Read a small page of staging-only Convex documents, projecting explicitly allowlisted fields for a specific project and table. Requires server document-access policy; disabled by default. No production documents or writes.",
+    inputSchema: { type: "object", properties: {
+      project: {type:"string"}, environment: {type:"string", enum:["staging"]},
+      table: {type:"string"}, order:{type:"string",enum:["asc","desc"]},
+      limit:{type:"integer",minimum:1,maximum:20}, cursor:{type:"string"}
+    }, required:["project","environment","table"],additionalProperties:false },
+    annotations: {readOnlyHint:true},
   },
   {
     name: "environment_names_list",
@@ -77,6 +87,13 @@ export async function runTool(name: unknown, argumentsInput: unknown): Promise<u
       if (name === "tables_list") return listTables(args.project,args.environment);
       if (name === "functions_list") return listFunctions(args.project,args.environment);
       return listUsageLimits(args.project,args.environment);
+    }
+    case "documents_list": {
+      const args = exactArguments(argumentsInput, ["project", "environment", "table", "order", "cursor", "limit"]);
+      if (!validSlug(args.project) || args.environment !== "staging") throw new SafeError("DOCUMENT_PRODUCTION_DISABLED");
+      return listDocuments(args.project,args.environment,args.table,{
+        order:args.order,cursor:args.cursor,limit:args.limit,
+      });
     }
     case "environment_names_list": {
       const args = exactArguments(argumentsInput, ["project", "environment"]);
