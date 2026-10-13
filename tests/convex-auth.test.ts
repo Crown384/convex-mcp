@@ -104,7 +104,7 @@ it("limits OTP requests in production even when no client IP header exists",asyn
   const t=convexTest(schema,import.meta.glob("../convex/**/*.ts"));
   t.registerComponent("betterAuth",authSchema,{...import.meta.glob("../convex/betterAuth/**/*.ts"),
     "../convex/betterAuth/_generated/server.ts":()=>import("../convex/_generated/server")});
-  vi.spyOn(globalThis,"fetch").mockResolvedValue(Response.json({Messages:[{Status:"success"}]}));
+  vi.spyOn(globalThis,"fetch").mockImplementation(async()=>Response.json({Messages:[{Status:"success"}]}));
   const statuses=[];
   for(let i=0;i<4;i++){
     const response=await t.fetch("/api/auth/email-otp/send-verification-otp",{method:"POST",
@@ -158,7 +158,7 @@ it("releases a failed delivery lease and atomically budgets public registrations
   t.registerComponent("betterAuth",authSchema,{...import.meta.glob("../convex/betterAuth/**/*.ts"),
     "../convex/betterAuth/_generated/server.ts":()=>import("../convex/_generated/server")});
   const mail=vi.spyOn(globalThis,"fetch").mockRejectedValueOnce(new Error("provider unavailable"))
-    .mockResolvedValue(Response.json({Messages:[{Status:"success"}]}));
+    .mockImplementation(async()=>Response.json({Messages:[{Status:"success"}]}));
   const headers={"content-type":"application/json",origin:"https://mcp.example.com"};
   const send=()=>t.fetch("/api/auth/email-otp/send-verification-otp",{method:"POST",headers,body:JSON.stringify({email:"owner@example.com",type:"sign-in"})});
   expect((await send()).status).not.toBe(200);
