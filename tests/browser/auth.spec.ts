@@ -30,6 +30,7 @@ test("ChatGPT OAuth login continues to consent and registered callback",async({p
   await expect(page).toHaveURL(/\/sign-in\?/);
   await page.getByLabel("Email address").fill("owner@example.com");
   await page.getByRole("button",{name:"Send code",exact:true}).click();
+  await expect(page.getByLabel("Sign-in code")).toBeFocused();
   const fixture=await (await request.get("http://127.0.0.1:3198/__qa/code")).json();
   await page.getByLabel("Sign-in code").fill(fixture.code);
   const verified=page.waitForResponse(response=>response.url().includes("/sign-in/email-otp"));
