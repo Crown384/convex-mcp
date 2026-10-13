@@ -155,9 +155,9 @@ describe("additional authentication negatives",()=>{
     parts[2]=(parts[2][0]==="a"?"b":"a")+parts[2].slice(1);
     await expect(authorizeMcp(auth,"Bearer "+parts.join("."))).rejects.toThrow();
     const payload=JSON.parse(Buffer.from(result.tokens.access_token.split(".")[1],"base64url").toString());
-    const signed=await auth.api.signJWT({body:{payload:{...payload,aud:"https://evil.example.com"},override:true}});
+    const signed=await auth.api.signJWT({body:{payload:{...payload,aud:"https://evil.example.com"}}});
     await expect(authorizeMcp(auth,"Bearer "+signed.token)).rejects.toThrow();
-    const expired=await auth.api.signJWT({body:{payload:{...payload,exp:1},override:true}});
+    const expired=await auth.api.signJWT({body:{payload:{...payload,exp:1}}});
     await expect(authorizeMcp(auth,"Bearer "+expired.token)).rejects.toThrow();
   });
   it("refreshes with rotation and rejects refresh-token replay",async()=>{
